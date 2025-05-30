@@ -6,6 +6,8 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.PriorityQueue;
 import java.util.List;
+import java.util.HashSet;
+import java.util.Set;
 
 /**
  * Класс для управления коллекцией организаций.
@@ -24,11 +26,23 @@ public class CollectionManager {
 
     /**
      * Конструктор для создания менеджера коллекции с предзагруженными организациями.
+     * При этом проверяется уникальность ID организаций —
+     * при обнаружении дублирующегося ID выбрасывается IllegalArgumentException.
      *
      * @param loadedOrganizations Список организаций для инициализации коллекции.
+     * @throws IllegalArgumentException если обнаружены дублирующиеся ID организаций.
      */
+
     public CollectionManager(List<Organization> loadedOrganizations) {
         this.organizationQueue = new PriorityQueue<>(Comparator.naturalOrder());
+
+        Set<Long> ids = new HashSet<>();
+        for (Organization org : loadedOrganizations) {
+            if (!ids.add(org.getId())) {
+                throw new IllegalArgumentException("Дублирующийся ID организации: " + org.getId());
+            }
+        }
+
         organizationQueue.addAll(loadedOrganizations);
     }
 
@@ -162,16 +176,6 @@ public class CollectionManager {
     }
 
     /**
-     * Выводит типы организаций в порядке убывания.
-     */
-    public void printFieldDescendingType() {
-        organizationQueue.stream()
-                .map(Organization::getType)
-                .sorted(Comparator.reverseOrder())
-                .forEach(System.out::println);
-    }
-
-    /**
      * Удаляет первый элемент коллекции.
      *
      * @return true, если элемент был удалён, иначе false.
@@ -213,7 +217,7 @@ public class CollectionManager {
     /**
      * Обновляет организацию по её ID.
      *
-     * @param id Идентификатор организации.
+     * @param id         Идентификатор организации.
      * @param updatedOrg Новая организация для обновления.
      * @return true, если организация была обновлена, иначе false.
      */

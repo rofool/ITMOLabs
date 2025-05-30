@@ -1,1 +1,34 @@
-[{"id":1,"creationDate":"2025-04-24T19:09:00.527722400+03:00[Europe/Moscow]","name":"Test Org","coordinates":{"x":10,"y":20},"annualTurnover":1000,"employeesCount":50,"type":"COMMERCIAL","officialAddress":{"street":"Test Street","zipCode":"123456"}}]
+[
+  {
+    "id": 3,
+    "creationDate": "2025-05-17T10:01:38.465717300+03:00[Europe/Moscow]",
+    "name": "OrgC",
+    "coordinates": {
+      "x": 3,
+      "y": 3
+    },
+    "annualTurnover": 300,
+    "employeesCount": 30,
+    "type": "PRIVATE_LIMITED_COMPANY",
+    "officialAddress": {
+      "street": "StreetC",
+      "zipCode": "789000"
+    }
+  },
+  {
+    "id": 5,
+    "creationDate": "2025-05-17T10:01:38.465717300+03:00[Europe/Moscow]",
+    "name": "MaxOrg",
+    "coordinates": {
+      "x": 999,
+      "y": 999
+    },
+    "annualTurnover": 9999,
+    "employeesCount": 99,
+    "type": "PRIVATE_LIMITED_COMPANY",
+    "officialAddress": {
+      "street": "MaxStreet",
+      "zipCode": "999000"
+    }
+  }
+]
