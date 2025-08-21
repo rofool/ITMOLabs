@@ -1,61 +1,54 @@
 package Lab5.Commands;
 
+import Lab5.Model.IdGenerator;
+import Lab5.Model.Organization;
 import Lab5.Storage.CollectionManager;
-import Lab5.Model.*;
+import Lab5.Utils.JsonHandler;
+import com.google.gson.Gson;
+
+import java.time.ZonedDateTime;
 
 /**
- * Команда для добавления новой организации в коллекцию.
- * Парсит аргументы, создает объект Organization и добавляет его через CollectionManager.
+ * Команда для добавления новой организации.
  */
 public class AddCommand implements Command {
     private final CollectionManager collectionManager;
+    private static final Gson gson = JsonHandler.gson;
 
-    /**
-     * Конструктор команды.
-     *
-     * @param collectionManager Менеджер коллекции, через который добавляются организации.
-     */
     public AddCommand(CollectionManager collectionManager) {
         this.collectionManager = collectionManager;
     }
 
-    /**
-     * Выполняет команду добавления организации.
-     * Ожидает аргументы в следующем порядке:
-     * name, x, y, annualTurnover, employeesCount, type, street, zipCode.
-     *
-     * @param args Аргументы команды для создания организации.
-     */
     @Override
-    public void execute(String[] args) {
-        try {
-            String name = args[0];
-            int x = Integer.parseInt(args[1]);
-            long y = Long.parseLong(args[2]);
-            Integer annualTurnover = args[3].isEmpty() ? null : Integer.parseInt(args[3]);
-            int employeesCount = Integer.parseInt(args[4]);
-            OrganizationType type = OrganizationType.valueOf(args[5].toUpperCase());
-            String street = args[6].isEmpty() ? null : args[6];
-            String zipCode = args[7];
+    public String execute(String[] args) {
+        if (args.length == 0 || args[0].trim().isEmpty()) {
+            return "Не указаны данные для добавления организации.";
+        }
 
-            Coordinates coordinates = new Coordinates(x, y);
-            Address address = new Address(street, zipCode);
-            Organization org = new Organization(name, coordinates, annualTurnover, employeesCount, type, address);
+        try {
+            String json = args[0].trim();
+            // Десериализуем без id и creationDate
+            Organization tempOrg = gson.fromJson(json, Organization.class);
+            if (tempOrg == null) {
+                return "Ошибка парсинга JSON.";
+            }
+
+            // Генерируем новый id и creationDate на сервере
+            Long newId = IdGenerator.generateId();
+            ZonedDateTime creationDate = ZonedDateTime.now();
+            Organization org = new Organization(newId, creationDate,
+                    tempOrg.getName(), tempOrg.getCoordinates(), tempOrg.getAnnualTurnover(),
+                    tempOrg.getEmployeesCount(), tempOrg.getType(), tempOrg.getOfficialAddress());
 
             collectionManager.add(org);
-            System.out.println("Организация добавлена.");
+            return "Организация добавлена: " + org.getName() + " (ID: " + newId + ")";
         } catch (Exception e) {
-            System.out.println("Ошибка при добавлении организации: " + e.getMessage());
+            return "Ошибка при добавлении организации: " + e.getMessage();
         }
     }
 
-    /**
-     * Возвращает описание команды.
-     *
-     * @return Описание команды.
-     */
     @Override
     public String getDescription() {
-        return "Добавить новый элемент в коллекцию";
+        return "Добавить новую организацию";
     }
 }

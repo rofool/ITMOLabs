@@ -27,12 +27,12 @@ public class SaveCommand implements Command {
      * @param args Аргументы команды (не используются).
      */
     @Override
-    public void execute(String[] args) {
+    public String execute(String[] args) {
         try {
             JsonHandler.saveToFile(collectionManager.getAsList(), filePath);
-            System.out.println("Коллекция сохранена в файл.");
+            return "Коллекция сохранена в файл.";
         } catch (Exception e) {
-            System.out.println("Ошибка при сохранении: " + e.getMessage());
+            return "Ошибка при сохранении: " + e.getMessage();
         }
     }
 

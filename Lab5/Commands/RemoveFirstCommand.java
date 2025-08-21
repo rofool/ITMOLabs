@@ -23,12 +23,12 @@ public class RemoveFirstCommand implements Command {
      * @param args Аргументы команды (не используются).
      */
     @Override
-    public void execute(String[] args) {
-        boolean removed = collectionManager.removeFirst();
+    public String execute(String[] args) {
+        boolean removed = Boolean.parseBoolean(collectionManager.removeFirst());
         if (removed) {
-            System.out.println("Первый элемент удалён.");
+            return"Первый элемент удалён.";
         } else {
-            System.out.println("Коллекция пуста, нечего удалять.");
+            return"Коллекция пуста, нечего удалять.";
         }
     }
 

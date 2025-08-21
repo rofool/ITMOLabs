@@ -4,6 +4,7 @@ import Lab5.Storage.CollectionManager;
 import Lab5.Model.Organization;
 import java.util.Comparator;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * Команда для вывода значений поля type всех организаций в порядке убывания.
@@ -27,12 +28,12 @@ public class PrintFieldDescendingTypeCommand implements Command {
      * @param args Аргументы команды (не используются).
      */
     @Override
-    public void execute(String[] args) {
+    public String execute(String[] args) {
         List<Organization> organizations = collectionManager.getAsList();
-        organizations.stream()
+        return  organizations.stream()
                 .map(Organization::getType)
-                .sorted(Comparator.reverseOrder())
-                .forEach(System.out::println);
+                .map(Enum::toString).collect(Collectors.joining());
+
     }
 
     /**

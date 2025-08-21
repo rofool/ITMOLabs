@@ -25,17 +25,17 @@ public class RemoveAnyByEmployeesCountCommand implements Command {
      * @param args Аргументы команды, первый элемент — employeesCount.
      */
     @Override
-    public void execute(String[] args) {
+    public String execute(String[] args) {
         try {
             int count = Integer.parseInt(args[0]);
-            boolean removed = collectionManager.removeAnyByEmployeesCount(count);
+            boolean removed =Boolean.getBoolean(collectionManager.removeAnyByEmployeesCount(count));
             if (removed) {
-                System.out.println("Организация с employeesCount = " + count + " удалена.");
+                return   "Организация с employeesCount = " + count + " удалена.";
             } else {
-                System.out.println("Организация с таким количеством сотрудников не найдена.");
+                return"Организация с таким количеством сотрудников не найдена.";
             }
         } catch (Exception e) {
-            System.out.println("Ошибка: " + e.getMessage());
+            return"Ошибка: " + e.getMessage();
         }
     }
 

@@ -15,7 +15,7 @@ import java.util.List;
  * Использует библиотеку Gson для сериализации и десериализации.
  */
 public class JsonHandler {
-    private static final Gson gson = new GsonBuilder()
+    public static final Gson gson = new GsonBuilder()
             .registerTypeAdapter(ZonedDateTime.class, new ZonedDateTimeAdapter())
             .setPrettyPrinting()
             .create();

@@ -1,57 +1,34 @@
 package Lab5.Storage;
 
+import Lab5.Model.IdGenerator;
 import Lab5.Model.Organization;
 
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.PriorityQueue;
-import java.util.List;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.*;
+import java.util.stream.Collectors;
 
-/**
- * Класс для управления коллекцией организаций.
- * Использует PriorityQueue для хранения организаций с возможностью сортировки.
- */
 public class CollectionManager {
     private final PriorityQueue<Organization> organizationQueue;
 
-    /**
-     * Конструктор по умолчанию для создания пустой коллекции.
-     * Использует сортировку по умолчанию (по количеству сотрудников).
-     */
     public CollectionManager() {
         this.organizationQueue = new PriorityQueue<>();
     }
 
-    /**
-     * Конструктор для создания менеджера коллекции с предзагруженными организациями.
-     * При этом проверяется уникальность ID организаций —
-     * при обнаружении дублирующегося ID выбрасывается IllegalArgumentException.
-     *
-     * @param loadedOrganizations Список организаций для инициализации коллекции.
-     * @throws IllegalArgumentException если обнаружены дублирующиеся ID организаций.
-     */
-
     public CollectionManager(List<Organization> loadedOrganizations) {
         this.organizationQueue = new PriorityQueue<>(Comparator.naturalOrder());
-
         Set<Long> ids = new HashSet<>();
+        long maxId = 0;
         for (Organization org : loadedOrganizations) {
             if (!ids.add(org.getId())) {
                 throw new IllegalArgumentException("Дублирующийся ID организации: " + org.getId());
             }
+            if (org.getId() > maxId) {
+                maxId = org.getId();
+            }
         }
-
+        IdGenerator.updateCounter(maxId);
         organizationQueue.addAll(loadedOrganizations);
     }
 
-    /**
-     * Получает организацию по её ID.
-     *
-     * @param id Идентификатор организации.
-     * @return Организация с заданным ID, или null, если не найдена.
-     */
     public Organization getById(long id) {
         for (Organization org : organizationQueue) {
             if (org.getId() == id) {
@@ -61,182 +38,104 @@ public class CollectionManager {
         return null;
     }
 
-    /**
-     * Удаляет организацию по её ID.
-     *
-     * @param id Идентификатор организации.
-     * @return true, если организация была удалена, иначе false.
-     */
     public boolean removeById(long id) {
         return organizationQueue.removeIf(org -> org.getId() == id);
     }
 
-    /**
-     * Возвращает коллекцию организаций как список.
-     *
-     * @return Список организаций.
-     */
     public List<Organization> getAsList() {
         return new ArrayList<>(organizationQueue);
     }
 
-    /**
-     * Добавляет организацию в коллекцию, если она больше всех в коллекции.
-     *
-     * @param org Организация для добавления.
-     */
-    public void addIfMax(Organization org) {
+    public String addIfMax(Organization org) {
         Organization max = organizationQueue.peek();
         if (max == null || org.compareTo(max) > 0) {
             organizationQueue.add(org);
-            System.out.println("Организация добавлена, она больше всех.");
+            return "Организация добавлена, она больше всех.";
         } else {
-            System.out.println("Организация не добавлена — не является максимальной.");
+            return "Организация не добавлена — не является максимальной.";
         }
     }
 
-    /**
-     * Добавляет организацию в коллекцию.
-     *
-     * @param org Организация для добавления.
-     */
-    public void add(Organization org) {
+    public String add(Organization org) {
         organizationQueue.add(org);
-        System.out.println("Организация добавлена: " + org.getName());
+        return "Организация добавлена: " + org.getName();
     }
 
-    /**
-     * Выводит все организации в коллекции.
-     */
-    public void show() {
+    public String show() {
         if (organizationQueue.isEmpty()) {
-            System.out.println("Коллекция пуста.");
-            return;
+            return "Коллекция пуста.";
         }
-
-        organizationQueue.forEach(System.out::println);
+        return organizationQueue.stream().map(Organization::toString).collect(Collectors.joining());
     }
 
-    /**
-     * Удаляет и возвращает первый элемент коллекции.
-     *
-     * @return Первый элемент или null, если коллекция пуста.
-     */
     public Organization removeHead() {
-        return organizationQueue.poll(); // вернёт и удалит "первый" элемент или null, если пусто
+        return organizationQueue.poll(); // Возвращает первый элемент или null, если пусто
     }
 
-    /**
-     * Добавляет организацию в коллекцию, если она меньше всех в коллекции.
-     *
-     * @param org Организация для добавления.
-     */
-    public void addIfMin(Organization org) {
+    public String addIfMin(Organization org) {
         Organization min = organizationQueue.peek();
         if (min == null || org.compareTo(min) < 0) {
             organizationQueue.add(org);
-            System.out.println("Организация добавлена, она меньше всех.");
+            return "Организация добавлена, она меньше всех.";
         } else {
-            System.out.println("Организация не добавлена — она не меньше минимального.");
+            return "Организация не добавлена — она не меньше минимального.";
         }
     }
 
-    /**
-     * Удаляет организацию с заданным количеством сотрудников.
-     *
-     * @param employeesCount Количество сотрудников.
-     * @return true, если организация была удалена, иначе false.
-     */
-    public boolean removeAnyByEmployeesCount(int employeesCount) {
+    public String removeAnyByEmployeesCount(int employeesCount) {
         for (Organization org : organizationQueue) {
             if (org.getEmployeesCount() == employeesCount) {
-                organizationQueue.remove(org); // удалим один
-                return true;
+                organizationQueue.remove(org);
+                return "true";
             }
         }
-        return false;
+        return "false";
     }
 
-    /**
-     * Фильтрует организации по заданному annualTurnover.
-     *
-     * @param turnover Значение оборота для фильтрации.
-     */
-    public void filterByAnnualTurnover(int turnover) {
-        boolean found = false;
+    public String filterByAnnualTurnover(int turnover) {
         for (Organization org : organizationQueue) {
             if (org.getAnnualTurnover() != null && org.getAnnualTurnover() == turnover) {
-                System.out.println(org);
-                found = true;
+                return org.toString();
             }
         }
-        if (!found) {
-            System.out.println("Нет организаций с annualTurnover = " + turnover);
-        }
+        return "Нет организаций с annualTurnover = " + turnover;
     }
 
-    /**
-     * Удаляет первый элемент коллекции.
-     *
-     * @return true, если элемент был удалён, иначе false.
-     */
-    public boolean removeFirst() {
+    public String removeFirst() {
         if (!organizationQueue.isEmpty()) {
             organizationQueue.poll();
-            return true;
+            return "true";
         }
-        return false;
+        return "false";
     }
 
-    /**
-     * Возвращает количество элементов в коллекции.
-     *
-     * @return Количество элементов в коллекции.
-     */
-    public int size() {
-        return organizationQueue.size();
+    public String size() {
+        return organizationQueue.size() + "";
     }
 
-    /**
-     * Очищает коллекцию.
-     */
-    public void clear() {
+    public String clear() {
         organizationQueue.clear();
+        return "Коллекция очищена";
     }
 
-    /**
-     * Удаляет организацию из коллекции.
-     *
-     * @param org Организация для удаления.
-     * @return true, если организация была удалена, иначе false.
-     */
-    public boolean remove(Organization org) {
-        return organizationQueue.remove(org);
+    public String remove(Organization org) {
+        organizationQueue.remove(org);
+        return "Удалено";
     }
 
-    /**
-     * Обновляет организацию по её ID.
-     *
-     * @param id         Идентификатор организации.
-     * @param updatedOrg Новая организация для обновления.
-     * @return true, если организация была обновлена, иначе false.
-     */
-    public boolean updateById(long id, Organization updatedOrg) {
+    public String updateById(long id, Organization updatedOrg) {
         for (Organization org : organizationQueue) {
             if (org.getId() == id) {
                 organizationQueue.remove(org);
                 organizationQueue.add(updatedOrg);
-                return true;
+                return "true";
             }
         }
-        return false;
+        return "false";
     }
 
-    /**
-     * Выводит информацию о коллекции (тип и размер).
-     */
-    public void info() {
-        System.out.println("Тип коллекции: PriorityQueue");
-        System.out.println("Количество элементов: " + organizationQueue.size());
+    public String info() {
+        return "Тип коллекции: PriorityQueue\n" +
+                "Количество элементов: " + organizationQueue.size();
     }
 }

@@ -13,9 +13,9 @@ public class ExitCommand implements Command {
      * @param args аргументы команды (не используются)
      */
     @Override
-    public void execute(String[] args) {
-        System.out.println("Завершение программы...");
+    public String execute(String[] args) {
         System.exit(0);
+        return "Завершение программы...";
     }
 
     /**

@@ -1,58 +1,39 @@
 package Lab5.Commands;
 
+import Lab5.Model.Organization;
 import Lab5.Storage.CollectionManager;
-import Lab5.Model.*;
+import com.google.gson.Gson;
+import Lab5.Utils.JsonHandler;
 
 /**
- * Команда для добавления новой организации в коллекцию,
- * если она меньше всех существующих элементов коллекции.
+ * Команда для добавления новой организации, если она меньше всех в коллекции.
  */
 public class AddIfMinCommand implements Command {
     private final CollectionManager collectionManager;
+    private static final Gson gson = JsonHandler.gson;
 
-    /**
-     * Конструктор команды.
-     *
-     * @param collectionManager Менеджер коллекции, управляющий организациями.
-     */
     public AddIfMinCommand(CollectionManager collectionManager) {
         this.collectionManager = collectionManager;
     }
 
-    /**
-     * Выполняет добавление организации в коллекцию, если она меньше всех.
-     * Ожидает аргументы в следующем порядке:
-     * name, x, y, annualTurnover, employeesCount, type, street, zipCode.
-     *
-     * @param args Аргументы команды.
-     */
     @Override
-    public void execute(String[] args) {
+    public String execute(String[] args) {
+        if (args.length == 0 || args[0].trim().isEmpty()) {
+            return "Не указаны данные для добавления организации.";
+        }
+
         try {
-            String name = args[0];
-            int x = Integer.parseInt(args[1]);
-            long y = Long.parseLong(args[2]);
-            Integer annualTurnover = args[3].isEmpty() ? null : Integer.parseInt(args[3]);
-            int employeesCount = Integer.parseInt(args[4]);
-            OrganizationType type = OrganizationType.valueOf(args[5].toUpperCase());
-            String street = args[6].isEmpty() ? null : args[6];
-            String zipCode = args[7];
-
-            Coordinates coordinates = new Coordinates(x, y);
-            Address address = new Address(street, zipCode);
-            Organization org = new Organization(name, coordinates, annualTurnover, employeesCount, type, address);
-
-            collectionManager.addIfMin(org);
+            String json = args[0].trim();
+            Organization org = gson.fromJson(json, Organization.class);
+            if (org == null) {
+                return "Ошибка парсинга JSON.";
+            }
+            return collectionManager.addIfMin(org);
         } catch (Exception e) {
-            System.out.println("Ошибка при добавлении организации: " + e.getMessage());
+            return "Ошибка при добавлении организации: " + e.getMessage();
         }
     }
 
-    /**
-     * Возвращает описание команды.
-     *
-     * @return Описание команды.
-     */
     @Override
     public String getDescription() {
         return "Добавить элемент, если он меньше всех в коллекции";

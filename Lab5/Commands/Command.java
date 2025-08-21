@@ -9,7 +9,7 @@ public interface Command {
      *
      * @param args аргументы команды
      */
-    void execute(String[] args);
+    String execute(String[] args);
 
     /**
      * Получить краткое описание команды.

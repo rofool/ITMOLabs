@@ -24,12 +24,12 @@ public class FilterByAnnualTurnoverCommand implements Command {
      * @param args Аргументы команды, первый элемент — значение annualTurnover.
      */
     @Override
-    public void execute(String[] args) {
+    public String execute(String[] args) {
         try {
             int turnover = Integer.parseInt(args[0]);
-            collectionManager.filterByAnnualTurnover(turnover);
+            return   collectionManager.filterByAnnualTurnover(turnover);
         } catch (Exception e) {
-            System.out.println("Ошибка: " + e.getMessage());
+            return "Ошибка: " + e.getMessage();
         }
     }
 

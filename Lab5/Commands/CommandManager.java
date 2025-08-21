@@ -46,13 +46,12 @@ public class CommandManager {
      * @param args Аргументы, передаваемые команде.
      * @return true, если команда найдена и успешно выполнена; false, если команда неизвестна.
      */
-    public boolean executeCommand(String commandName, String[] args) {
+    public String executeCommand(String commandName, String[] args) {
         Command command = commands.get(commandName.toLowerCase());
         if (command == null) {
             System.out.println("Неизвестная команда: " + commandName);
-            return false;
+            return "false";
         }
-        command.execute(args);
-        return true;
+        return   command.execute(args);
     }
 }

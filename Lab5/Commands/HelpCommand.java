@@ -23,11 +23,12 @@ public class HelpCommand implements Command {
      * @param args Аргументы команды (не используются).
      */
     @Override
-    public void execute(String[] args) {
-        System.out.println("Список доступных команд:");
+    public String execute(String[] args) {
+        StringBuilder result = new StringBuilder("Список доступных команд:\n");
         for (Map.Entry<String, Command> entry : commands.entrySet()) {
-            System.out.printf("  %s — %s%n", entry.getKey(), entry.getValue().getDescription());
+            result.append(String.format("  %s — %s%n", entry.getKey(), entry.getValue().getDescription()));
         }
+        return result.toString().trim();
     }
 
     /**

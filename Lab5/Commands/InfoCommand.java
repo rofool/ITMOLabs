@@ -24,8 +24,8 @@ public class InfoCommand implements Command {
      * @param args Аргументы команды (не используются).
      */
     @Override
-    public void execute(String[] args) {
-        collectionManager.info();
+    public String execute(String[] args) {
+        return collectionManager.info();
     }
 
     /**
