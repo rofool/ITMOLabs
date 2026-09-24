@@ -1,0 +1,27 @@
+plugins { id 'java' }
+
+repositories { mavenCentral() }
+
+dependencies {
+    implementation 'org.postgresql:postgresql:42.7.3'
+    implementation 'com.google.code.gson:gson:2.10.1'
+}
+
+java { toolchain { languageVersion = JavaLanguageVersion.of(17) } }
+tasks.withType(JavaCompile) { options.encoding = 'UTF-8' }
+
+tasks.register('runServer', JavaExec) {
+    group = 'application'
+    description = 'Run server'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'service.Server'
+    environment 'DB_URL',  System.getenv('DB_URL')  ?: 'jdbc:postgresql://localhost:5432/itmo'
+    environment 'DB_USER', System.getenv('DB_USER') ?: 'postgres'
+    environment 'DB_PASS', System.getenv('DB_PASS') ?: 'postgres'
+}
+tasks.register('runClient', JavaExec) {
+    group = 'application'
+    description = 'Run client'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'client.Client'
+}

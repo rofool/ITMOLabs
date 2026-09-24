@@ -1,0 +1,197 @@
+@startuml
+
+' Классы из Commands
+class Command {
+    +execute(args: String[]): void
+    +getDescription(): String
+}
+
+class CommandManager {
+    +commands: Map<String, Command>
+    +executeCommand(commandName: String, args: String[]): boolean
+}
+
+class AddCommand {
+    +execute(args: String[]): void
+}
+
+class AddIfMaxCommand {
+    +execute(args: String[]): void
+}
+
+class AddIfMinCommand {
+    +execute(args: String[]): void
+}
+
+class ClearCommand {
+    +execute(args: String[]): void
+}
+
+class ExecuteScriptCommand {
+    +execute(args: String[]): void
+}
+
+class ExitCommand {
+    +execute(args: String[]): void
+}
+
+class FilterByAnnualTurnoverCommand {
+    +execute(args: String[]): void
+}
+
+class HelpCommand {
+    +execute(args: String[]): void
+}
+
+class InfoCommand {
+    +execute(args: String[]): void
+}
+
+class PrintFieldDescendingTypeCommand {
+    +execute(args: String[]): void
+}
+
+class RemoveAnyByEmployeesCountCommand {
+    +execute(args: String[]): void
+}
+
+class RemoveByIdCommand {
+    +execute(args: String[]): void
+}
+
+class RemoveFirstCommand {
+    +execute(args: String[]): void
+}
+
+class RemoveHeadCommand {
+    +execute(args: String[]): void
+}
+
+class SaveCommand {
+    +execute(args: String[]): void
+}
+
+class ShowCommand {
+    +execute(args: String[]): void
+}
+
+class UpdateCommand {
+    +execute(args: String[]): void
+}
+
+' Классы из Model
+class Address {
+    +street: String
+    +zipCode: String
+}
+
+class Coordinates {
+    +x: Integer
+    +y: Long
+}
+
+class IdGenerator {
+    +generateId(): Long
+    +updateCounter(maxId: long): void
+}
+
+class Organization implements Comparable<Organization> {
+    +id: Long
+    +creationDate: ZonedDateTime
+    +name: String
+    +coordinates: Coordinates
+    +annualTurnover: Integer
+    +employeesCount: int
+    +type: OrganizationType
+    +officialAddress: Address
+    +compareTo(other: Organization): int
+}
+
+class OrganizationType {
+    +COMMERCIAL
+    +PUBLIC
+    +PRIVATE_LIMITED_COMPANY
+}
+
+' Классы из Storage
+class CollectionManager {
+    +organizationQueue: PriorityQueue<Organization>
+    +add(org: Organization): void
+    +addIfMax(org: Organization): void
+    +addIfMin(org: Organization): void
+    +removeById(id: long): boolean
+    +removeFirst(): boolean
+    +removeHead(): Organization
+    +remove(org: Organization): boolean
+    +updateById(id: long, updatedOrg: Organization): boolean
+    +clear(): void
+    +info(): void
+    +getAsList(): List<Organization>
+}
+
+' Классы из Utils
+class InputHelper {
+    +readString(prompt: String, allowEmpty: boolean): String
+    +readInt(prompt: String, positiveOnly: boolean): int
+    +readLong(prompt: String): long
+    +readEnum(prompt: String, enumClass: Class<E>): E
+}
+
+class JsonHandler {
+    +loadFromFile(filePath: String): List<Organization>
+    +saveToFile(organizations: List<Organization>, filePath: String): void
+}
+
+class ZonedDateTimeAdapter {
+    +serialize(src: ZonedDateTime, typeOfSrc: Type, context: JsonSerializationContext): JsonElement
+    +deserialize(json: JsonElement, typeOfT: Type, context: JsonDeserializationContext): ZonedDateTime
+}
+
+' Связи между классами
+CommandManager --> Command
+CommandManager --> AddCommand
+CommandManager --> AddIfMaxCommand
+CommandManager --> AddIfMinCommand
+CommandManager --> ClearCommand
+CommandManager --> ExecuteScriptCommand
+CommandManager --> ExitCommand
+CommandManager --> FilterByAnnualTurnoverCommand
+CommandManager --> HelpCommand
+CommandManager --> InfoCommand
+CommandManager --> PrintFieldDescendingTypeCommand
+CommandManager --> RemoveAnyByEmployeesCountCommand
+CommandManager --> RemoveByIdCommand
+CommandManager --> RemoveFirstCommand
+CommandManager --> RemoveHeadCommand
+CommandManager --> SaveCommand
+CommandManager --> ShowCommand
+CommandManager --> UpdateCommand
+
+AddCommand --> CollectionManager
+AddIfMaxCommand --> CollectionManager
+AddIfMinCommand --> CollectionManager
+ClearCommand --> CollectionManager
+ExecuteScriptCommand --> CommandManager
+ExitCommand --> System
+FilterByAnnualTurnoverCommand --> CollectionManager
+HelpCommand --> CommandManager
+InfoCommand --> CollectionManager
+PrintFieldDescendingTypeCommand --> CollectionManager
+RemoveAnyByEmployeesCountCommand --> CollectionManager
+RemoveByIdCommand --> CollectionManager
+RemoveFirstCommand --> CollectionManager
+RemoveHeadCommand --> CollectionManager
+SaveCommand --> CollectionManager
+ShowCommand --> CollectionManager
+UpdateCommand --> CollectionManager
+
+CollectionManager --> Organization
+CollectionManager --> IdGenerator
+
+JsonHandler --> CollectionManager
+JsonHandler --> Organization
+JsonHandler --> File
+
+ZonedDateTimeAdapter ..> ZonedDateTime
+
+@enduml

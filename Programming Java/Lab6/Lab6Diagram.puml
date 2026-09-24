@@ -1,0 +1,93 @@
+@startuml
+
+' === PACKAGES ===
+package client {
+  class Client
+  class ClientHandler
+}
+
+package Commands {
+  interface Command
+  abstract class AbstractCommand
+  class AddCommand
+  class AddIfMaxCommand
+  class AddIfMinCommand
+  class ClearCommand
+  class CommandManager
+  class ExecuteScriptCommand
+  class ExitCommand
+  class FilterByAnnualTurnoverCommand
+  class HelpCommand
+  class InfoCommand
+  class PrintFieldDescendingTypeCommand
+  class RemoveAnyByEmployeesCountCommand
+  class RemoveByIdCommand
+  class RemoveFirstCommand
+  class RemoveHeadCommand
+  class SaveCommand
+  class ShowCommand
+  class UpdateCommand
+}
+
+package Model {
+  class Organization
+  class Address
+  class Coordinates
+  enum OrganizationType
+  class IdGenerator
+}
+
+package Storage {
+  class CollectionManager
+}
+
+package service {
+  class Server
+}
+
+package Utils {
+  class InputHelper
+  class JsonHandler
+  class ZonedDateTimeAdapter
+}
+
+' === RELATIONSHIPS ===
+AbstractCommand <|-- AddCommand
+AbstractCommand <|-- AddIfMaxCommand
+AbstractCommand <|-- AddIfMinCommand
+AbstractCommand <|-- ClearCommand
+AbstractCommand <|-- ExecuteScriptCommand
+AbstractCommand <|-- ExitCommand
+AbstractCommand <|-- FilterByAnnualTurnoverCommand
+AbstractCommand <|-- HelpCommand
+AbstractCommand <|-- InfoCommand
+AbstractCommand <|-- PrintFieldDescendingTypeCommand
+AbstractCommand <|-- RemoveAnyByEmployeesCountCommand
+AbstractCommand <|-- RemoveByIdCommand
+AbstractCommand <|-- RemoveFirstCommand
+AbstractCommand <|-- RemoveHeadCommand
+AbstractCommand <|-- SaveCommand
+AbstractCommand <|-- ShowCommand
+AbstractCommand <|-- UpdateCommand
+Command <|.. AbstractCommand
+
+CommandManager --> Command
+ClientHandler --> CommandManager
+Server --> ClientHandler
+Server --> CommandManager
+Server --> CollectionManager
+Client --> Socket
+Client --> CommandManager
+AddCommand --> Organization
+UpdateCommand --> Organization
+Organization --> Coordinates
+Organization --> Address
+Organization --> OrganizationType
+Organization --> IdGenerator
+CollectionManager --> Organization
+ExecuteScriptCommand --> CommandManager
+JsonHandler --> Organization
+JsonHandler --> ZonedDateTimeAdapter
+InputHelper --> Scanner
+
+@enduml

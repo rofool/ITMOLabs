@@ -1,0 +1,18 @@
+[
+  {
+    "id": 1,
+    "creationDate": "2025-08-23T19:37:21.593300+03:00[Europe/Moscow]",
+    "name": "NewName",
+    "coordinates": {
+      "x": 10,
+      "y": 30
+    },
+    "annualTurnover": 1000,
+    "employeesCount": 5,
+    "type": "PUBLIC",
+    "officialAddress": {
+      "street": "streetMain",
+      "zipCode": "12345"
+    }
+  }
+]

@@ -1,0 +1,2324 @@
+--- Start of D:\Proj\ITMOLabs\Lab7\ExportJavaSources.java ---
+import java.io.*;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.*;
+import java.util.stream.Stream;
+
+public class ExportJavaSources {
+    public static void main(String[] args) {
+        Path root = Paths.get(".").toAbsolutePath().normalize(); // корень проекта
+        Path out = root.resolve("all_sources.txt");
+
+        try (BufferedWriter writer = Files.newBufferedWriter(out,
+                StandardCharsets.UTF_8,
+                StandardOpenOption.CREATE,
+                StandardOpenOption.TRUNCATE_EXISTING)) {
+
+            try (Stream<Path> paths = Files.walk(root)) {
+                paths.filter(Files::isRegularFile)
+                        .filter(p -> p.toString().endsWith(".java"))
+                        .sorted()
+                        .forEach(p -> dumpFile(writer, p));
+            }
+
+            System.out.println("Готово: " + out);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private static void dumpFile(BufferedWriter writer, Path file) {
+        try {
+            String absPath = file.toAbsolutePath().toString();
+            writer.write("--- Start of " + absPath + " ---\n");
+            Files.lines(file, StandardCharsets.UTF_8).forEach(line -> {
+                try {
+                    writer.write(line);
+                    writer.newLine();
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+            });
+            writer.write("--- End of " + absPath + " ---\n\n");
+        } catch (IOException e) {
+            System.err.println("Ошибка с файлом " + file + ": " + e.getMessage());
+        }
+    }
+}
+--- End of D:\Proj\ITMOLabs\Lab7\ExportJavaSources.java ---
+
+--- Start of D:\Proj\ITMOLabs\Lab7\src\main\java\client\Client.java ---
+package main.java.client;
+
+import java.io.*;
+import java.net.Socket;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.security.CodeSource;
+import java.util.Scanner;
+
+public class Client {
+    private final String host;
+    private final int port;
+
+    public Client(String host, int port) {
+        this.host = host;
+        this.port = port;
+    }
+
+    public void start(String[] args) {
+        try (Socket socket = new Socket(host, port);
+             PrintWriter out = new PrintWriter(new OutputStreamWriter(socket.getOutputStream(), StandardCharsets.UTF_8), true);
+             BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8));
+             Scanner scanner = new Scanner(System.in)) {
+
+            System.out.println("Подключено к серверу.");
+
+            System.out.print("Логин: ");
+            String login = scanner.nextLine().trim();
+            System.out.print("Пароль: ");
+            String password = scanner.nextLine().trim();
+
+            System.out.println("Введите команду (help — список):");
+            System.out.println("Если это ваш первый вход — введите 'register'.");
+
+            String[] commands = (args.length > 0) ? args : new String[0];
+            boolean useArgs = commands.length > 0;
+
+            while (true) {
+                String command;
+                if (useArgs && commands.length > 0) {
+                    command = commands[0];
+                    String[] newCommands = new String[commands.length - 1];
+                    System.arraycopy(commands, 1, newCommands, 0, newCommands.length);
+                    commands = newCommands;
+                    if (commands.length == 0) useArgs = false;
+                } else {
+                    System.out.print("> ");
+                    command = scanner.nextLine().trim();
+                }
+                if (command.isEmpty()) continue;
+
+                String[] parts = command.split("\\s+", 2);
+                String commandName = parts[0].toLowerCase();
+                String argsStr = parts.length > 1 ? parts[1].trim() : "";
+
+                if (commandName.equals("execute_script")) {
+                    if (argsStr.isEmpty()) {
+                        System.out.println("Укажите путь к файлу: execute_script <file>");
+                        continue;
+                    }
+                    Path scriptPath = resolveScriptPath(argsStr);
+                    if (scriptPath == null || !Files.exists(scriptPath)) {
+                        System.out.println("Файл скрипта не найден: " + argsStr);
+                        continue;
+                    }
+                    runScript(scriptPath, out, in, login, password);
+                    continue;
+                }
+
+                // Интерактивный ввод сложных объектов
+                if ((commandName.equals("add") || commandName.equals("add_if_max")
+                        || commandName.equals("add_if_min") || commandName.equals("update"))
+                        && argsStr.isEmpty() && !useArgs) {
+                    argsStr = promptInteractiveInput(commandName, scanner);
+                }
+                // Интерактив для простых числовых
+                else if (commandName.equals("remove_any_by_employees_count") && argsStr.isEmpty() && !useArgs) {
+                    System.out.print("Введите employeesCount: ");
+                    argsStr = scanner.nextLine().trim();
+                } else if (commandName.equals("remove_by_id") && argsStr.isEmpty() && !useArgs) {
+                    System.out.print("Введите ID: ");
+                    argsStr = scanner.nextLine().trim();
+                } else if (commandName.equals("filter_by_annual_turnover") && argsStr.isEmpty() && !useArgs) {
+                    System.out.print("Введите annualTurnover: ");
+                    argsStr = scanner.nextLine().trim();
+                }
+                // Позиционные → JSON (только для сложных команд)
+                else if (!argsStr.isEmpty()
+                        && !commandName.equals("remove_by_id")
+                        && !commandName.equals("filter_by_annual_turnover")
+                        && !commandName.equals("remove_any_by_employees_count")) {
+                    if (!argsStr.startsWith("{")) {
+                        argsStr = convertToJson(commandName, argsStr.split("\\s+"));
+                    }
+                }
+
+                String fullCommand = commandName + (argsStr.isEmpty() ? "" : " " + argsStr);
+                String wire = login + ":" + password + "|" + fullCommand;
+
+                System.out.println("Отправка команды: " + fullCommand);
+                out.println(wire);
+
+                readAndPrintResponse(in, command);
+            }
+        } catch (IOException e) {
+            System.out.println("Ошибка подключения: " + e.getMessage());
+        }
+    }
+
+    // --- helpers ---
+
+    private void readAndPrintResponse(BufferedReader in, String originalCommand) {
+        try {
+            StringBuilder response = new StringBuilder();
+            String line;
+            while ((line = in.readLine()) != null) {
+                if (line.isEmpty()) break; // сервер всегда присылает пустую строку-разделитель
+                response.append(line).append("\n");
+            }
+            if (response.length() > 0) {
+                System.out.println(response.toString().trim());
+            } else {
+                System.out.println("Нет ответа от сервера для команды: " + originalCommand);
+            }
+        } catch (IOException e) {
+            System.out.println("Ошибка чтения ответа: " + e.getMessage());
+        }
+    }
+
+    private Path resolveScriptPath(String arg) {
+        // 1) как дали
+        Path p = Paths.get(arg);
+        if (Files.exists(p)) return p;
+
+        // 2) рядом с JAR клиента
+        try {
+            CodeSource cs = Client.class.getProtectionDomain().getCodeSource();
+            if (cs != null && cs.getLocation() != null) {
+                File jarDir = new File(cs.getLocation().toURI()).getParentFile();
+                if (jarDir != null) {
+                    Path p2 = jarDir.toPath().resolve(arg);
+                    if (Files.exists(p2)) return p2;
+                }
+            }
+        } catch (Exception ignore) {}
+
+        // 3) текущая рабочая директория (на всякий)
+        Path p3 = Paths.get(".").toAbsolutePath().normalize().resolve(arg);
+        if (Files.exists(p3)) return p3;
+
+        return null;
+    }
+
+    private void runScript(Path scriptPath, PrintWriter out, BufferedReader in,
+                           String login, String password) {
+        System.out.println("Выполняю скрипт: " + scriptPath.toAbsolutePath());
+        try (BufferedReader reader = new BufferedReader(
+                new InputStreamReader(new FileInputStream(scriptPath.toFile()), StandardCharsets.UTF_8))) {
+
+            String line;
+            while ((line = reader.readLine()) != null) {
+                line = line.trim();
+                if (line.isEmpty() || line.startsWith("#")) continue;
+
+                String[] parts = line.split("\\s+", 2);
+                String cmdName = parts[0].toLowerCase();
+                String argsStr = (parts.length > 1) ? parts[1].trim() : "";
+
+                // Для add / add_if_min / add_if_max / update — если не JSON, то конвертим позиционные
+                if (!argsStr.isEmpty()
+                        && (cmdName.equals("add") || cmdName.equals("add_if_min")
+                        || cmdName.equals("add_if_max") || cmdName.equals("update"))
+                        && !argsStr.startsWith("{")) {
+                    argsStr = convertToJson(cmdName, argsStr.split("\\s+"));
+                }
+
+                String full = cmdName + (argsStr.isEmpty() ? "" : " " + argsStr);
+                String wire = login + ":" + password + "|" + full;
+
+                System.out.println("Скрипт -> " + full);
+                out.println(wire);
+
+                readAndPrintResponse(in, full);
+
+                // защита от самоуничтожения сервера из скрипта
+                if (cmdName.equals("exit")) {
+                    System.out.println("Команда exit в скрипте пропущена (завершает сервер).");
+                    break;
+                }
+            }
+            System.out.println("Скрипт выполнился успешно.");
+        } catch (FileNotFoundException e) {
+            System.out.println("Файл не найден: " + scriptPath);
+        } catch (IOException e) {
+            System.out.println("Ошибка чтения файла скрипта: " + e.getMessage());
+        }
+    }
+
+    private String promptInteractiveInput(String commandName, Scanner scanner) {
+        if ("add".equals(commandName) || "add_if_max".equals(commandName) || "add_if_min".equals(commandName)) {
+            System.out.println("Введите название организации:");
+            String name = scanner.nextLine().trim();
+            System.out.println("Введите координату X (int):");
+            String x = scanner.nextLine().trim();
+            System.out.println("Введите координату Y (long):");
+            String y = scanner.nextLine().trim();
+            System.out.println("Введите годовой оборот (можно оставить пустым):");
+            String turnover = scanner.nextLine().trim();
+            System.out.println("Введите количество сотрудников (int):");
+            String employees = scanner.nextLine().trim();
+            System.out.println("Введите тип организации (COMMERCIAL, PUBLIC, PRIVATE_LIMITED_COMPANY):");
+            String type = scanner.nextLine().trim().toUpperCase();
+            System.out.println("Введите улицу (можно оставить пустой):");
+            String street = scanner.nextLine().trim();
+            System.out.println("Введите ZIP-код:");
+            String zip = scanner.nextLine().trim();
+
+            return String.format(
+                    "{\"name\":\"%s\",\"coordinates\":{\"x\":%s,\"y\":%s},\"annualTurnover\":%s,\"employeesCount\":%s,\"type\":\"%s\",\"officialAddress\":{\"street\":\"%s\",\"zipCode\":\"%s\"}}",
+                    name, x, y, turnover.isEmpty() ? "null" : turnover, employees, type,
+                    street.isEmpty() ? "null" : street, zip
+            );
+        } else if ("update".equals(commandName)) {
+            System.out.println("Введите ID организации:");
+            String id = scanner.nextLine().trim();
+            System.out.println("Введите название организации:");
+            String name = scanner.nextLine().trim();
+            System.out.println("Введите координату X (int):");
+            String x = scanner.nextLine().trim();
+            System.out.println("Введите координату Y (long):");
+            String y = scanner.nextLine().trim();
+            System.out.println("Введите годовой оборот (можно оставить пустым):");
+            String turnover = scanner.nextLine().trim();
+            System.out.println("Введите количество сотрудников (int):");
+            String employees = scanner.nextLine().trim();
+            System.out.println("Введите тип организации (COMMERCIAL, PUBLIC, PRIVATE_LIMITED_COMPANY):");
+            String type = scanner.nextLine().trim().toUpperCase();
+            System.out.println("Введите улицу (можно оставить пустой):");
+            String street = scanner.nextLine().trim();
+            System.out.println("Введите ZIP-код:");
+            String zip = scanner.nextLine().trim();
+
+            return String.format(
+                    "{\"id\":%s,\"name\":\"%s\",\"coordinates\":{\"x\":%s,\"y\":%s},\"annualTurnover\":%s,\"employeesCount\":%s,\"type\":\"%s\",\"officialAddress\":{\"street\":\"%s\",\"zipCode\":\"%s\"}}",
+                    id, name, x, y, turnover.isEmpty() ? "null" : turnover, employees, type,
+                    street.isEmpty() ? "null" : street, zip
+            );
+        }
+        return "";
+    }
+
+    private String convertToJson(String commandName, String[] args) {
+        StringBuilder json = new StringBuilder("{");
+        if ("add".equals(commandName) || "add_if_max".equals(commandName) || "add_if_min".equals(commandName)) {
+            if (args.length >= 8) {
+                json.append("\"name\":\"").append(args[0]).append("\",")
+                        .append("\"coordinates\":{\"x\":").append(args[1]).append(",\"y\":").append(args[2]).append("},")
+                        .append("\"annualTurnover\":").append(args[3].isEmpty() ? "null" : args[3]).append(",")
+                        .append("\"employeesCount\":").append(args[4]).append(",")
+                        .append("\"type\":\"").append(args[5]).append("\",")
+                        .append("\"officialAddress\":{\"street\":\"").append(args[6].isEmpty() ? "null" : args[6]).append("\",\"zipCode\":\"").append(args[7]).append("\"}");
+            }
+        } else if ("update".equals(commandName)) {
+            if (args.length >= 9) {
+                json.append("\"id\":").append(args[0]).append(",")
+                        .append("\"name\":\"").append(args[1]).append("\",")
+                        .append("\"coordinates\":{\"x\":").append(args[2]).append(",\"y\":").append(args[3]).append("},")
+                        .append("\"annualTurnover\":").append(args[4].isEmpty() ? "null" : args[4]).append(",")
+                        .append("\"employeesCount\":").append(args[5]).append(",")
+                        .append("\"type\":\"").append(args[6]).append("\",")
+                        .append("\"officialAddress\":{\"street\":\"").append(args[7].isEmpty() ? "null" : args[7]).append("\",\"zipCode\":\"").append(args[8]).append("\"}");
+            }
+        }
+        json.append("}");
+        return json.toString();
+    }
+
+    public static void main(String[] args) {
+        String host = "localhost";
+        int port = 8082;
+        Client client = new Client(host, port);
+        client.start(args);
+    }
+}
+--- End of D:\Proj\ITMOLabs\Lab7\src\main\java\client\Client.java ---
+
+--- Start of D:\Proj\ITMOLabs\Lab7\src\main\java\client\ClientHandler.java ---
+package main.java.client;
+
+import main.java.Commands.CommandManager;
+import main.java.db.DataBaseManager;
+
+import java.io.*;
+import java.net.Socket;
+import java.util.Optional;
+import java.util.concurrent.ExecutorService;
+
+public class ClientHandler implements Runnable {
+    private final Socket socket;
+    private final CommandManager commandManager;
+    private final ExecutorService processPool; // обработка
+    private final ExecutorService sendPool;    // отправка
+
+    public ClientHandler(Socket socket, CommandManager commandManager,
+                         ExecutorService processPool, ExecutorService sendPool) {
+        this.socket = socket;
+        this.commandManager = commandManager;
+        this.processPool = processPool;
+        this.sendPool = sendPool;
+    }
+
+    @Override
+    public void run() {
+        try (BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream(), "UTF-8"));
+             PrintWriter out = new PrintWriter(new OutputStreamWriter(socket.getOutputStream(), "UTF-8"), true)) {
+
+            final Object sendLock = new Object(); // чтобы ответы одному клиенту шли последовательно
+
+            String wire;
+            while ((wire = in.readLine()) != null) {
+                final String line = wire;
+                if (line.trim().isEmpty()) {
+                    // пустая строка — сразу отправим пустую (разделитель сообщений)
+                    sendPool.submit(() -> {
+                        synchronized (sendLock) { out.println(); out.flush(); }
+                    });
+                    continue;
+                }
+
+                // Каждую команду обрабатываем в CachedPool
+                processPool.submit(() -> {
+                    String response;
+                    try {
+                        int bar = line.indexOf('|');
+                        if (bar <= 0) {
+                            response = "Ошибка протокола: используйте 'login:password|команда'.";
+                            send(sendPool, sendLock, out, response);
+                            return;
+                        }
+                        String lp = line.substring(0, bar);
+                        String commandPart = line.substring(bar + 1);
+
+                        int colon = lp.indexOf(':');
+                        if (colon <= 0) {
+                            response = "Ошибка протокола: отсутствует ':' между логином и паролем.";
+                            send(sendPool, sendLock, out, response);
+                            return;
+                        }
+                        String login = lp.substring(0, colon);
+                        String pass  = lp.substring(colon + 1);
+
+                        String[] parts = commandPart.split("\\s+", 2);
+                        String commandName = parts[0].toLowerCase();
+                        String[] commandArgs = parts.length > 1 ? new String[]{parts[1]} : new String[0];
+
+                        // register — без авторизации
+                        if (commandName.equals("register")) {
+                            try {
+                                long id = DataBaseManager.register(login, pass);
+                                response = "201 Пользователь создан, id=" + id;
+                            } catch (Exception e) {
+                                response = "Ошибка регистрации: " + e.getMessage();
+                            }
+                            send(sendPool, sendLock, out, response);
+                            return;
+                        }
+
+                        // help — тоже без авторизации
+                        if (commandName.equals("help")) {
+                            response = commandManager.executeCommand("help", new String[0]) +
+                                    "\nПодсказка: если видите '401 Неавторизовано', выполните 'register'.";
+                            send(sendPool, sendLock, out, response);
+                            return;
+                        }
+
+                        // Остальные — с авторизацией
+                        Optional<Long> ownerOpt;
+                        try {
+                            ownerOpt = DataBaseManager.authenticate(login, pass);
+                        } catch (Exception e) {
+                            response = "Ошибка БД: " + e.getMessage();
+                            send(sendPool, sendLock, out, response);
+                            return;
+                        }
+                        if (ownerOpt.isEmpty()) {
+                            response = "401 Неавторизовано. Подсказка: выполните 'register' и повторите команду.";
+                            send(sendPool, sendLock, out, response);
+                            return;
+                        }
+                        long ownerId = ownerOpt.get();
+
+                        if (commandName.equals("exit")) {
+                            response = "Сервер: завершение работы по команде exit.";
+                            send(sendPool, sendLock, out, response);
+                            System.exit(0);
+                            return;
+                        }
+
+                        // ВАЖНО: команды вызываем через перегрузку с ownerId
+                        response = commandManager.executeCommand(commandName, commandArgs, ownerId);
+                        if (response == null || response.isEmpty()) response = "Команда выполнена, нет вывода.";
+                    } catch (Exception e) {
+                        response = "Внутренняя ошибка обработки: " + e.getMessage();
+                    }
+                    send(sendPool, sendLock, out, response);
+                });
+            }
+        } catch (IOException e) {
+            System.err.println("Ошибка обработки клиента: " + e.getMessage());
+        } finally {
+            try { socket.close(); } catch (IOException e) { System.err.println("Ошибка закрытия сокета: " + e.getMessage()); }
+        }
+    }
+
+    private static void send(ExecutorService sendPool, Object lock, PrintWriter out, String payload) {
+        sendPool.submit(() -> {
+            synchronized (lock) {
+                out.println(payload);
+                out.println(); // разделитель ответа
+                out.flush();
+            }
+        });
+    }
+}
+--- End of D:\Proj\ITMOLabs\Lab7\src\main\java\client\ClientHandler.java ---
+
+--- Start of D:\Proj\ITMOLabs\Lab7\src\main\java\Commands\AbstractCommand.java ---
+package main.java.Commands;
+
+import main.java.Storage.CollectionManager;
+
+public abstract class AbstractCommand implements Command {
+    protected static CollectionManager collectionManager = new CollectionManager();
+
+    public AbstractCommand(CollectionManager collectionManager) {
+        AbstractCommand.collectionManager = collectionManager;
+    }
+
+    public AbstractCommand() {
+    }
+}
+--- End of D:\Proj\ITMOLabs\Lab7\src\main\java\Commands\AbstractCommand.java ---
+
+--- Start of D:\Proj\ITMOLabs\Lab7\src\main\java\Commands\AddCommand.java ---
+package main.java.Commands;
+
+import main.java.Model.Organization;
+import main.java.Model.OrganizationDraft;
+import main.java.Storage.CollectionManager;
+import main.java.Utils.JsonHandler;
+import main.java.db.DataBaseManager;
+
+/** Добавление организации ТОЛЬКО для авторизованного пользователя */
+public class AddCommand implements AuthenticatedCommand {
+    private final CollectionManager collectionManager;
+
+    public AddCommand(CollectionManager collectionManager) {
+        this.collectionManager = collectionManager;
+    }
+
+    /** Вызов без ownerId не допускается */
+    @Override public String execute(String[] args) { return "Требуется авторизация."; }
+
+    @Override
+    public String execute(String[] args, long ownerId) {
+        if (args.length == 0 || args[0].trim().isEmpty()) {
+            return "Не указаны данные для добавления организации.";
+        }
+        try {
+            String json = args[0].trim();
+
+
+            OrganizationDraft draft = JsonHandler.gson.fromJson(json, OrganizationDraft.class);
+            if (draft == null) return "Ошибка парсинга JSON.";
+
+
+            Organization saved = DataBaseManager.insertOrganization(draft, ownerId);
+
+
+            collectionManager.add(saved);
+
+            return "Организация добавлена: " + saved.getName() + " (ID: " + saved.getId() + ")";
+        } catch (Exception e) {
+            return "Ошибка при добавлении организации: " + e.getMessage();
+        }
+    }
+
+    @Override
+    public String getDescription() {
+        return "Добавить новую организацию (требуется авторизация)";
+    }
+}
+--- End of D:\Proj\ITMOLabs\Lab7\src\main\java\Commands\AddCommand.java ---
+
+--- Start of D:\Proj\ITMOLabs\Lab7\src\main\java\Commands\AddIfMinCommand.java ---
+package main.java.Commands;
+
+import com.google.gson.Gson;
+import main.java.Model.Organization;
+import main.java.Model.OrganizationDraft;
+import main.java.Storage.CollectionManager;
+import main.java.Utils.JsonHandler;
+import main.java.db.DataBaseManager;
+
+import java.time.ZonedDateTime;
+
+public class AddIfMinCommand implements AuthenticatedCommand {
+    private final CollectionManager collectionManager;
+    private static final Gson gson = JsonHandler.gson;
+
+    public AddIfMinCommand(CollectionManager collectionManager) {
+        this.collectionManager = collectionManager;
+    }
+
+    @Override
+    public String execute(String[] args) { return "Требуется авторизация."; }
+
+    @Override
+    public String execute(String[] args, long ownerId) {
+        if (args.length == 0 || args[0].trim().isEmpty()) {
+            return "Не указаны данные для добавления организации.";
+        }
+        try {
+            OrganizationDraft d = gson.fromJson(args[0].trim(), OrganizationDraft.class);
+            if (d == null) return "Ошибка парсинга JSON.";
+
+
+            Organization probe = new Organization(
+                    1L, ZonedDateTime.now(),
+                    d.name, d.coordinates, d.annualTurnover, d.employeesCount, d.type, d.officialAddress
+            );
+
+            if (!collectionManager.isMin(probe)) {
+                return "Организация не добавлена — она не меньше минимальной.";
+            }
+
+            // Сначала пишем в БД, затем добавляем в память
+            Organization saved = DataBaseManager.insertOrganization(d, ownerId);
+            collectionManager.add(saved);
+            return "Организация добавлена, она меньше всех (ID: " + saved.getId() + ").";
+        } catch (Exception e) {
+            return "Ошибка при добавлении организации: " + e.getMessage();
+        }
+    }
+
+    @Override
+    public String getDescription() {
+        return "Добавить элемент, если он меньше всех в коллекции";
+    }
+}
+--- End of D:\Proj\ITMOLabs\Lab7\src\main\java\Commands\AddIfMinCommand.java ---
+
+--- Start of D:\Proj\ITMOLabs\Lab7\src\main\java\Commands\AuthenticatedCommand.java ---
+package main.java.Commands;
+
+public interface AuthenticatedCommand extends Command {
+
+    @Override
+    default String execute(String[] args) {
+        return "Требуется авторизация.";
+    }
+
+    String execute(String[] args, long ownerId);
+}
+--- End of D:\Proj\ITMOLabs\Lab7\src\main\java\Commands\AuthenticatedCommand.java ---
+
+--- Start of D:\Proj\ITMOLabs\Lab7\src\main\java\Commands\ClearCommand.java ---
+package main.java.Commands;
+
+import main.java.Storage.CollectionManager;
+import main.java.db.DataBaseManager;
+
+import java.util.List;
+
+public class ClearCommand implements AuthenticatedCommand {
+    private final CollectionManager collectionManager;
+
+    public ClearCommand(CollectionManager collectionManager) { this.collectionManager = collectionManager; }
+
+    @Override public String execute(String[] args) { return "Требуется авторизация."; }
+
+    @Override
+    public String execute(String[] args, long ownerId) {
+        try {
+            int deleted = DataBaseManager.deleteAllByOwner(ownerId);
+
+            List<main.java.Model.Organization> fresh = DataBaseManager.loadAllOrganizations();
+            collectionManager.replaceAll(fresh);
+            return "Удалено ваших объектов: " + deleted + ".";
+        } catch (Exception e) {
+            return "Ошибка при очистке: " + e.getMessage();
+        }
+    }
+
+    @Override
+    public String getDescription() { return "Очистить коллекцию (удаляет только ваши объекты в БД)"; }
+}
+--- End of D:\Proj\ITMOLabs\Lab7\src\main\java\Commands\ClearCommand.java ---
+
+--- Start of D:\Proj\ITMOLabs\Lab7\src\main\java\Commands\Command.java ---
+package main.java.Commands;
+
+/**
+ * Интерфейс, описывающий команду, которая может быть выполнена с набором аргументов.
+ */
+public interface Command {
+    /**
+     * Выполнить команду с переданными аргументами.
+     *
+     * @param args аргументы команды
+     */
+    String execute(String[] args);
+
+    /**
+     * Получить краткое описание команды.
+     *
+     * @return описание команды
+     */
+    String getDescription();
+}
+--- End of D:\Proj\ITMOLabs\Lab7\src\main\java\Commands\Command.java ---
+
+--- Start of D:\Proj\ITMOLabs\Lab7\src\main\java\Commands\CommandManager.java ---
+package main.java.Commands;
+
+import main.java.Storage.CollectionManager;
+
+import java.util.HashMap;
+import java.util.Map;
+
+public class CommandManager {
+    private final Map<String, Command> commands = new HashMap<>();
+
+    public CommandManager(CollectionManager collectionManager, String filePath) {
+
+        commands.put("help", new HelpCommand(commands));
+        commands.put("info", new InfoCommand(collectionManager));
+        commands.put("show", new ShowCommand(collectionManager));
+        commands.put("add", new AddCommand(collectionManager));
+        commands.put("update", new UpdateCommand(collectionManager));
+        commands.put("remove_by_id", new RemoveByIdCommand(collectionManager));
+        commands.put("clear", new ClearCommand(collectionManager));
+        commands.put("remove_first", new RemoveFirstCommand(collectionManager));
+        commands.put("remove_head", new RemoveHeadCommand(collectionManager));
+        commands.put("add_if_min", new AddIfMinCommand(collectionManager));
+        commands.put("remove_any_by_employees_count", new RemoveAnyByEmployeesCountCommand(collectionManager));
+        commands.put("filter_by_annual_turnover", new FilterByAnnualTurnoverCommand(collectionManager));
+        commands.put("print_field_descending_type", new PrintFieldDescendingTypeCommand(collectionManager));
+        commands.put("execute_script", new ExecuteScriptCommand(this));
+        commands.put("exit", new ExitCommand());
+    }
+
+    /**
+     * Вызов без авторизации (help, show, info и т.п.)
+     */
+    public String executeCommand(String commandName, String[] args) {
+        Command command = commands.get(commandName.toLowerCase());
+        if (command == null) return "Неизвестная команда: " + commandName;
+        return command.execute(args);
+    }
+
+    /**
+     * Вызов с ownerId после успешной аутентификации
+     */
+    public String executeCommand(String commandName, String[] args, long ownerId) {
+        Command command = commands.get(commandName.toLowerCase());
+        if (command == null) return "Неизвестная команда: " + commandName;
+
+        if (command instanceof AuthenticatedCommand ac) {
+            return ac.execute(args, ownerId);
+        } else {
+
+            return command.execute(args);
+        }
+    }
+}
+--- End of D:\Proj\ITMOLabs\Lab7\src\main\java\Commands\CommandManager.java ---
+
+--- Start of D:\Proj\ITMOLabs\Lab7\src\main\java\Commands\ExecuteScriptCommand.java ---
+package main.java.Commands;
+
+import java.util.HashSet;
+import java.util.Set;
+
+public class ExecuteScriptCommand implements AuthenticatedCommand {
+    private final CommandManager commandManager;
+    private final Set<String> activeScripts = new HashSet<>();
+
+    public ExecuteScriptCommand(CommandManager commandManager) {
+        this.commandManager = commandManager;
+    }
+
+    @Override
+    public String execute(String[] args) { return "Требуется авторизация."; }
+
+    @Override
+    public String execute(String[] args, long ownerId) {
+        if (args.length == 0 || args[0].trim().isEmpty()) {
+            return "Не указано содержимое скрипта.";
+        }
+
+        String scriptContent = args[0].trim();
+        String scriptId = Integer.toString(scriptContent.hashCode());
+
+        if (activeScripts.contains(scriptId)) {
+            return "Ошибка: рекурсивный вызов скрипта обнаружен!";
+        }
+
+        activeScripts.add(scriptId);
+        try {
+            String[] lines = scriptContent.split("\n");
+            for (String line : lines) {
+                line = line.trim();
+                if (line.isEmpty() || line.startsWith("#")) continue;
+
+                String[] parts = line.split("\\s+", 2);
+                String cmdName = parts[0].toLowerCase();
+                String[] cmdArgs = parts.length > 1 ? new String[]{parts[1].trim()} : new String[0];
+
+
+                if (cmdName.equals("add") || cmdName.equals("add_if_max") || cmdName.equals("add_if_min")) {
+                    if (cmdArgs.length == 1 && cmdArgs[0].startsWith("{")) {
+
+                    } else {
+
+                        String[] a = parts.length > 1 ? parts[1].trim().split("\\s+") : new String[0];
+                        if (a.length < 8) return "Ошибка: Недостаточно аргументов для команды " + cmdName;
+                        cmdArgs = new String[]{convertToJson(cmdName, a)};
+                    }
+                } else if (cmdName.equals("update")) {
+                    if (cmdArgs.length == 1 && cmdArgs[0].startsWith("{")) {
+
+                    } else {
+                        String[] a = parts.length > 1 ? parts[1].trim().split("\\s+") : new String[0];
+                        if (a.length < 9) return "Ошибка: Недостаточно аргументов для команды " + cmdName;
+                        cmdArgs = new String[]{convertToJson(cmdName, a)};
+                    }
+                } else if (cmdName.equals("filter_by_annual_turnover")
+                        || cmdName.equals("remove_any_by_employees_count")
+                        || cmdName.equals("remove_by_id")) {
+
+                    cmdArgs = parts.length > 1 ? new String[]{parts[1].trim()} : new String[0];
+                }
+
+                String r = commandManager.executeCommand(cmdName, cmdArgs, ownerId);
+                if (r == null) r = "";
+                if (r.startsWith("Неизвестная команда")) return r;
+            }
+            return "Скрипт выполнился успешно.";
+        } catch (Exception e) {
+            return "Ошибка выполнения скрипта: " + e.getMessage();
+        } finally {
+            activeScripts.remove(scriptId);
+        }
+    }
+
+    private String convertToJson(String commandName, String[] args) {
+        StringBuilder json = new StringBuilder("{");
+        if ("add".equals(commandName) || "add_if_max".equals(commandName) || "add_if_min".equals(commandName)) {
+            json.append("\"name\":\"").append(args[0]).append("\",")
+                    .append("\"coordinates\":{\"x\":").append(args[1]).append(",\"y\":").append(args[2]).append("},")
+                    .append("\"annualTurnover\":").append(args[3].isEmpty() ? "null" : args[3]).append(",")
+                    .append("\"employeesCount\":").append(args[4]).append(",")
+                    .append("\"type\":\"").append(args[5]).append("\",")
+                    .append("\"officialAddress\":{\"street\":\"").append(args[6].isEmpty() ? "null" : args[6]).append("\",\"zipCode\":\"").append(args[7]).append("\"}");
+        } else if ("update".equals(commandName)) {
+            json.append("\"id\":").append(args[0]).append(",")
+                    .append("\"name\":\"").append(args[1]).append("\",")
+                    .append("\"coordinates\":{\"x\":").append(args[2]).append(",\"y\":").append(args[3]).append("},")
+                    .append("\"annualTurnover\":").append(args[4].isEmpty() ? "null" : args[4]).append(",")
+                    .append("\"employeesCount\":").append(args[5]).append(",")
+                    .append("\"type\":\"").append(args[6]).append("\",")
+                    .append("\"officialAddress\":{\"street\":\"").append(args[7].isEmpty() ? "null" : args[7]).append("\",\"zipCode\":\"").append(args[8]).append("\"}");
+        }
+        json.append("}");
+        return json.toString();
+    }
+
+    @Override
+    public String getDescription() { return "Выполнить скрипт из переданного содержимого"; }
+}
+--- End of D:\Proj\ITMOLabs\Lab7\src\main\java\Commands\ExecuteScriptCommand.java ---
+
+--- Start of D:\Proj\ITMOLabs\Lab7\src\main\java\Commands\ExitCommand.java ---
+package main.java.Commands;
+
+/**
+ * Команда для завершения работы программы.
+ * При выполнении выводит сообщение и завершает JVM с кодом 0.
+ */
+public class ExitCommand implements Command {
+
+    /**
+     * Выполняет команду завершения программы.
+     * Игнорирует переданные аргументы.
+     *
+     * @param args аргументы команды (не используются)
+     */
+    @Override
+    public String execute(String[] args) {
+        System.exit(0);
+        return "Завершение программы...";
+    }
+
+    /**
+     * Возвращает описание команды.
+     *
+     * @return Описание команды.
+     */
+    @Override
+    public String getDescription() {
+        return "Завершить программу";
+    }
+}
+--- End of D:\Proj\ITMOLabs\Lab7\src\main\java\Commands\ExitCommand.java ---
+
+--- Start of D:\Proj\ITMOLabs\Lab7\src\main\java\Commands\FilterByAnnualTurnoverCommand.java ---
+package main.java.Commands;
+
+import main.java.Storage.CollectionManager;
+
+/**
+ * Команда для фильтрации и вывода организаций по заданному значению annualTurnover.
+ */
+public class FilterByAnnualTurnoverCommand implements Command {
+    private final CollectionManager collectionManager;
+
+    /**
+     * Конструктор команды.
+     *
+     * @param collectionManager Менеджер коллекции, в которой происходит фильтрация.
+     */
+    public FilterByAnnualTurnoverCommand(CollectionManager collectionManager) {
+        this.collectionManager = collectionManager;
+    }
+
+    /**
+     * Выполняет фильтрацию организаций по заданному annualTurnover.
+     * Ожидает один аргумент — значение annualTurnover для фильтрации.
+     *
+     * @param args Аргументы команды, первый элемент — значение annualTurnover.
+     */
+    @Override
+    public String execute(String[] args) {
+        try {
+            int turnover = Integer.parseInt(args[0]);
+            return   collectionManager.filterByAnnualTurnover(turnover);
+        } catch (Exception e) {
+            return "Ошибка: " + e.getMessage();
+        }
+    }
+
+    /**
+     * Возвращает описание команды.
+     *
+     * @return Описание команды.
+     */
+    @Override
+    public String getDescription() {
+        return "Вывести элементы с заданным annualTurnover";
+    }
+}
+--- End of D:\Proj\ITMOLabs\Lab7\src\main\java\Commands\FilterByAnnualTurnoverCommand.java ---
+
+--- Start of D:\Proj\ITMOLabs\Lab7\src\main\java\Commands\HelpCommand.java ---
+package main.java.Commands;
+
+import java.util.Map;
+
+/**
+ * Команда для вывода списка всех доступных команд с их описаниями.
+ */
+public class HelpCommand implements Command {
+    private final Map<String, Command> commands;
+
+    /**
+     * Конструктор команды.
+     *
+     * @param commands Карта всех зарегистрированных команд.
+     */
+    public HelpCommand(Map<String, Command> commands) {
+        this.commands = commands;
+    }
+
+    /**
+     * Выводит список всех доступных команд и их описания.
+     *
+     * @param args Аргументы команды (не используются).
+     */
+    @Override
+    public String execute(String[] args) {
+        StringBuilder result = new StringBuilder("Список доступных команд:\n");
+        for (Map.Entry<String, Command> entry : commands.entrySet()) {
+            result.append(String.format("  %s — %s%n", entry.getKey(), entry.getValue().getDescription()));
+        }
+        return result.toString().trim();
+    }
+
+    /**
+     * Возвращает описание команды.
+     *
+     * @return Описание команды.
+     */
+    @Override
+    public String getDescription() {
+        return "Вывести справку по доступным командам";
+    }
+}
+--- End of D:\Proj\ITMOLabs\Lab7\src\main\java\Commands\HelpCommand.java ---
+
+--- Start of D:\Proj\ITMOLabs\Lab7\src\main\java\Commands\InfoCommand.java ---
+package main.java.Commands;
+
+import main.java.Storage.CollectionManager;
+
+/**
+ * Команда для вывода информации о коллекции организаций.
+ * Показывает тип коллекции, дату инициализации и количество элементов.
+ */
+public class InfoCommand implements Command {
+    private final CollectionManager collectionManager;
+
+    /**
+     * Конструктор команды.
+     *
+     * @param collectionManager Менеджер коллекции организаций.
+     */
+    public InfoCommand(CollectionManager collectionManager) {
+        this.collectionManager = collectionManager;
+    }
+
+    /**
+     * Выполняет команду вывода информации о коллекции.
+     *
+     * @param args Аргументы команды (не используются).
+     */
+    @Override
+    public String execute(String[] args) {
+        return collectionManager.info();
+    }
+
+    /**
+     * Возвращает описание команды.
+     *
+     * @return Описание команды.
+     */
+    @Override
+    public String getDescription() {
+        return "Вывести информацию о коллекции (тип, дата инициализации, количество элементов)";
+    }
+}
+--- End of D:\Proj\ITMOLabs\Lab7\src\main\java\Commands\InfoCommand.java ---
+
+--- Start of D:\Proj\ITMOLabs\Lab7\src\main\java\Commands\PrintFieldDescendingTypeCommand.java ---
+package main.java.Commands;
+
+import main.java.Storage.CollectionManager;
+import main.java.Model.Organization;
+
+import java.util.Comparator;
+import java.util.List;
+import java.util.stream.Collectors;
+
+/**
+ * Вывести значения поля type всех элементов в порядке убывания.
+ */
+public class PrintFieldDescendingTypeCommand implements Command {
+    private final CollectionManager collectionManager;
+
+    public PrintFieldDescendingTypeCommand(CollectionManager collectionManager) {
+        this.collectionManager = collectionManager;
+    }
+
+    @Override
+    public String execute(String[] args) {
+        List<Organization> organizations = collectionManager.getAsList();
+        if (organizations.isEmpty()) return "Коллекция пуста.";
+
+        return organizations.stream()
+                .map(Organization::getType)
+                .sorted(Comparator.reverseOrder())
+                .map(Enum::name)
+                .collect(Collectors.joining("\n"));
+    }
+
+    @Override
+    public String getDescription() {
+        return "Вывести значения поля type всех элементов в порядке убывания";
+    }
+}
+--- End of D:\Proj\ITMOLabs\Lab7\src\main\java\Commands\PrintFieldDescendingTypeCommand.java ---
+
+--- Start of D:\Proj\ITMOLabs\Lab7\src\main\java\Commands\RemoveAnyByEmployeesCountCommand.java ---
+package main.java.Commands;
+
+import main.java.Storage.CollectionManager;
+import main.java.db.DataBaseManager;
+
+/** Удалить ЛЮБОЙ ОДИН объект пользователя по employeesCount */
+public class RemoveAnyByEmployeesCountCommand implements AuthenticatedCommand {
+    private final CollectionManager collectionManager;
+
+    public RemoveAnyByEmployeesCountCommand(CollectionManager collectionManager) {
+        this.collectionManager = collectionManager;
+    }
+
+    @Override public String execute(String[] args) { return "Требуется авторизация."; }
+
+    @Override
+    public String execute(String[] args, long ownerId) {
+
+        if (args.length == 0 || args[0].isBlank()) {
+            return "Ошибка: укажите количество сотрудников.";
+        }
+        try {
+            int count = Integer.parseInt(args[0].trim());
+
+
+            var idOpt = DataBaseManager.findAnyByOwnerAndEmployees(ownerId, count);
+            if (idOpt.isEmpty()) {
+                return "У вас нет организации с employeesCount = " + count;
+            }
+            long id = idOpt.get();
+
+
+            boolean ok = DataBaseManager.deleteOrganization(id, ownerId);
+            if (!ok) return "Не удалось удалить (похоже, уже удалено или нет прав).";
+
+            collectionManager.replaceAll(DataBaseManager.loadAllOrganizations());
+            return "Удалена ваша организация (ID " + id + ") с employeesCount = " + count + ".";
+        } catch (NumberFormatException e) {
+            return "Ошибка: employeesCount должен быть целым числом.";
+        } catch (Exception e) {
+            return "Ошибка при удалении: " + e.getMessage();
+        }
+    }
+
+    @Override
+    public String getDescription() {
+        return "Удалить любой объект по employeesCount (только ваш)";
+    }
+}
+--- End of D:\Proj\ITMOLabs\Lab7\src\main\java\Commands\RemoveAnyByEmployeesCountCommand.java ---
+
+--- Start of D:\Proj\ITMOLabs\Lab7\src\main\java\Commands\RemoveByIdCommand.java ---
+package main.java.Commands;
+
+import main.java.Storage.CollectionManager;
+import main.java.db.DataBaseManager;
+
+public class RemoveByIdCommand implements AuthenticatedCommand {
+    private final CollectionManager collectionManager;
+
+    public RemoveByIdCommand(CollectionManager collectionManager) { this.collectionManager = collectionManager; }
+
+    @Override public String execute(String[] args) { return "Требуется авторизация."; }
+
+    @Override
+    public String execute(String[] args, long ownerId) {
+        if (args.length == 0) return "Ошибка: Укажите ID организации для удаления.";
+        try {
+            long id = Long.parseLong(args[0]);
+            boolean ok = DataBaseManager.deleteOrganization(id, ownerId);
+            if (!ok) return "Не удалось удалить: либо нет прав, либо ID не существует.";
+            boolean removed = collectionManager.removeById(id);
+            return removed ? ("Организация с ID " + id + " удалена.")
+                    : "Удалено в БД, но не найдено в памяти (перезапустите сервер для синхронизации).";
+        } catch (NumberFormatException e) {
+            return "Ошибка: некорректный ID (ожидается число).";
+        } catch (Exception e) {
+            return "Ошибка при удалении: " + e.getMessage();
+        }
+    }
+
+    @Override public String getDescription() { return "Удалить элемент по ID"; }
+}
+--- End of D:\Proj\ITMOLabs\Lab7\src\main\java\Commands\RemoveByIdCommand.java ---
+
+--- Start of D:\Proj\ITMOLabs\Lab7\src\main\java\Commands\RemoveFirstCommand.java ---
+package main.java.Commands;
+
+import main.java.Storage.CollectionManager;
+import main.java.db.DataBaseManager;
+
+public class RemoveFirstCommand implements AuthenticatedCommand {
+    private final CollectionManager collectionManager;
+
+    public RemoveFirstCommand(CollectionManager collectionManager) { this.collectionManager = collectionManager; }
+
+    @Override public String execute(String[] args) { return "Требуется авторизация."; }
+
+    @Override
+    public String execute(String[] args, long ownerId) {
+        try {
+            var headOpt = DataBaseManager.findHead();
+            if (headOpt.isEmpty()) return "Коллекция пуста, нечего удалять.";
+            var head = headOpt.get();
+            if (head.ownerId != ownerId) return "Первый элемент вам не принадлежит. Удаление запрещено.";
+            boolean ok = DataBaseManager.deleteOrganization(head.org.getId(), ownerId);
+            if (!ok) return "Не удалось удалить первый элемент (в БД).";
+
+            collectionManager.replaceAll(DataBaseManager.loadAllOrganizations());
+            return "Первый элемент удалён.";
+        } catch (Exception e) {
+            return "Ошибка: " + e.getMessage();
+        }
+    }
+
+    @Override public String getDescription() { return "Удалить первый элемент коллекции (если он ваш)"; }
+}
+--- End of D:\Proj\ITMOLabs\Lab7\src\main\java\Commands\RemoveFirstCommand.java ---
+
+--- Start of D:\Proj\ITMOLabs\Lab7\src\main\java\Commands\RemoveHeadCommand.java ---
+package main.java.Commands;
+
+import main.java.Storage.CollectionManager;
+import main.java.db.DataBaseManager;
+
+public class RemoveHeadCommand implements AuthenticatedCommand {
+    private final CollectionManager collectionManager;
+
+    public RemoveHeadCommand(CollectionManager collectionManager) { this.collectionManager = collectionManager; }
+
+    @Override public String execute(String[] args) { return "Требуется авторизация."; }
+
+    @Override
+    public String execute(String[] args, long ownerId) {
+        try {
+            var headOpt = DataBaseManager.findHead();
+            if (headOpt.isEmpty()) return "Коллекция пуста, нечего удалять.";
+            var head = headOpt.get();
+            String printed = head.org.toString();
+            if (head.ownerId != ownerId) return "Первый элемент: \n" + printed + "\nНо он вам не принадлежит. Удаление запрещено.";
+            boolean ok = DataBaseManager.deleteOrganization(head.org.getId(), ownerId);
+            if (!ok) return "Первый элемент: \n" + printed + "\nУдалить не удалось (в БД).";
+            collectionManager.replaceAll(DataBaseManager.loadAllOrganizations());
+            return "Удалён первый элемент: \n" + printed;
+        } catch (Exception e) {
+            return "Ошибка: " + e.getMessage();
+        }
+    }
+
+    @Override public String getDescription() { return "Вывести и удалить первый элемент (если он ваш)"; }
+}
+--- End of D:\Proj\ITMOLabs\Lab7\src\main\java\Commands\RemoveHeadCommand.java ---
+
+--- Start of D:\Proj\ITMOLabs\Lab7\src\main\java\Commands\SaveCommand.java ---
+package main.java.Commands;
+
+import main.java.Storage.CollectionManager;
+import main.java.Utils.JsonHandler;
+
+/**
+ * Команда для сохранения текущего состояния коллекции в файл.
+ */
+public class SaveCommand implements Command {
+    private final CollectionManager collectionManager;
+    private final String filePath;
+
+    /**
+     * Конструктор команды.
+     *
+     * @param collectionManager Менеджер коллекции организаций.
+     * @param filePath Путь к файлу для сохранения коллекции.
+     */
+    public SaveCommand(CollectionManager collectionManager, String filePath) {
+        this.collectionManager = collectionManager;
+        this.filePath = filePath;
+    }
+
+    /**
+     * Выполняет сохранение коллекции в указанный файл.
+     *
+     * @param args Аргументы команды (не используются).
+     */
+    @Override
+    public String execute(String[] args) {
+        try {
+            JsonHandler.saveToFile(collectionManager.getAsList(), filePath);
+            return "Коллекция сохранена в файл.";
+        } catch (Exception e) {
+            return "Ошибка при сохранении: " + e.getMessage();
+        }
+    }
+
+    /**
+     * Возвращает описание команды.
+     *
+     * @return Описание команды.
+     */
+    @Override
+    public String getDescription() {
+        return "Сохранить коллекцию в файл";
+    }
+}
+--- End of D:\Proj\ITMOLabs\Lab7\src\main\java\Commands\SaveCommand.java ---
+
+--- Start of D:\Proj\ITMOLabs\Lab7\src\main\java\Commands\ShowCommand.java ---
+package main.java.Commands;
+
+import main.java.Model.Organization;
+import main.java.Storage.CollectionManager;
+
+import java.util.Comparator;
+import java.util.stream.Collectors;
+
+/**
+ * Команда для вывода всех организаций с полной информацией (по id по возрастанию).
+ */
+public class ShowCommand implements Command {
+    private final CollectionManager collectionManager;
+
+    public ShowCommand(CollectionManager collectionManager) {
+        this.collectionManager = collectionManager;
+    }
+
+    @Override
+    public String execute(String[] args) {
+        if (collectionManager.sizeInt() == 0) {
+            return "Коллекция пуста.";
+        }
+        return collectionManager.getAsList().stream()
+                .sorted(Comparator.comparingLong(o -> o.getId()))
+                .map(Organization::toString)
+                .collect(Collectors.joining("\n"));
+    }
+
+    @Override
+    public String getDescription() {
+        return "Вывести всю информацию о всех элементах коллекции";
+    }
+}
+--- End of D:\Proj\ITMOLabs\Lab7\src\main\java\Commands\ShowCommand.java ---
+
+--- Start of D:\Proj\ITMOLabs\Lab7\src\main\java\Commands\UpdateCommand.java ---
+package main.java.Commands;
+
+import main.java.Model.*;
+import main.java.Storage.CollectionManager;
+import main.java.Utils.JsonHandler;
+import main.java.db.DataBaseManager;
+
+public class UpdateCommand implements AuthenticatedCommand {
+    private final CollectionManager collectionManager;
+
+    public UpdateCommand(CollectionManager collectionManager) { this.collectionManager = collectionManager; }
+
+    @Override public String execute(String[] args) { return "Требуется авторизация."; }
+
+    @Override
+    public String execute(String[] args, long ownerId) {
+        if (args.length == 0 || args[0].trim().isEmpty()) return "Не указан JSON с данными для обновления.";
+        try {
+            String json = args[0].trim();
+            var obj = com.google.gson.JsonParser.parseString(json).getAsJsonObject();
+            if (!obj.has("id")) return "В JSON отсутствует поле id";
+            long id = obj.get("id").getAsLong();
+
+            Organization old = collectionManager.getById(id);
+            if (old == null) return "Организация с таким ID не найдена.";
+
+            OrganizationDraft d = JsonHandler.gson.fromJson(json, OrganizationDraft.class);
+            Organization updated = new Organization(
+                    id, old.getCreationDate(),
+                    d.name, new Coordinates(d.coordinates.getX(), d.coordinates.getY()),
+                    d.annualTurnover, d.employeesCount, d.type,
+                    (d.officialAddress == null ? null : new Address(d.officialAddress.getStreet(), d.officialAddress.getZipCode()))
+            );
+
+            boolean ok = DataBaseManager.updateOrganization(updated, ownerId);
+            if (!ok) return "Не удалось обновить: либо нет прав, либо ID не существует.";
+
+            if (collectionManager.updateByIdBool(id, updated)) return "Организация обновлена.";
+            return "Ошибка при обновлении в памяти.";
+        } catch (Exception e) {
+            return "Ошибка при обновлении: " + e.getMessage();
+        }
+    }
+
+    @Override public String getDescription() { return "Обновить организацию по ID (ожидает JSON с id)"; }
+}
+--- End of D:\Proj\ITMOLabs\Lab7\src\main\java\Commands\UpdateCommand.java ---
+
+--- Start of D:\Proj\ITMOLabs\Lab7\src\main\java\db\Bootstrap.java ---
+package main.java.db;
+
+public class Bootstrap {
+    public static void main(String[] args) throws Exception {
+        DataBaseManager.connect();
+        long id = DataBaseManager.register("testuser", "testpass"); // пароль хэшнётся MD2
+        System.out.println("created user id = " + id);
+    }
+}
+--- End of D:\Proj\ITMOLabs\Lab7\src\main\java\db\Bootstrap.java ---
+
+--- Start of D:\Proj\ITMOLabs\Lab7\src\main\java\db\DataBaseManager.java ---
+package main.java.db;
+
+import main.java.Model.Address;
+import main.java.Model.Coordinates;
+import main.java.Model.Organization;
+import main.java.Model.OrganizationDraft;
+import main.java.Model.OrganizationType;
+
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.sql.*;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+
+public final class DataBaseManager {
+    private static final String URL  = System.getenv().getOrDefault("DB_URL",  "jdbc:postgresql://localhost:5432/studs");
+    private static final String USER = System.getenv().getOrDefault("DB_USER", "s467185");
+    private static final String PASS = System.getenv().getOrDefault("DB_PASS", "pTZvu82P0YIHlOwD");
+
+    private static Connection connection;
+
+    private static final String SQL_FIND_USER_BY_LOGIN =
+            "SELECT id, login, pass_md2_hex FROM app_user WHERE login = ?";
+
+    private static final String SQL_INSERT_USER =
+            "INSERT INTO app_user(login, pass_md2_hex) VALUES (?,?) RETURNING id";
+
+    private static final String SQL_SELECT_ALL_ORG = """
+        SELECT id,name,x,y,annual_turnover,employees_count,type,street,zip_code,creation_date,owner_id
+        FROM organization ORDER BY id
+        """;
+
+    private static final String SQL_INSERT_ORG = """
+        INSERT INTO organization(name,x,y,annual_turnover,employees_count,type,street,zip_code,owner_id)
+        VALUES (?,?,?,?,?,?,?,?,?) RETURNING id, creation_date
+        """;
+
+    private static final String SQL_UPDATE_ORG = """
+        UPDATE organization
+        SET name=?, x=?, y=?, annual_turnover=?, employees_count=?, type=?, street=?, zip_code=?
+        WHERE id=? AND owner_id=?
+        """;
+
+    private static final String SQL_DELETE_ORG =
+            "DELETE FROM organization WHERE id=? AND owner_id=?";
+
+    private static final String SQL_SELECT_HEAD = """
+        SELECT id,name,x,y,annual_turnover,employees_count,type,street,zip_code,creation_date,owner_id
+        FROM organization
+        ORDER BY employees_count ASC, id ASC
+        LIMIT 1
+        """;
+
+
+    private static final String SQL_DELETE_ALL_BY_OWNER =
+            "DELETE FROM organization WHERE owner_id=?";
+
+    public static void connect() {
+        try {
+            Class.forName("org.postgresql.Driver");
+            System.out.println("[DB] url=" + URL +
+                    ", user=" + USER +
+                    ", passLen=" + (PASS == null ? -1 : PASS.length()) +
+                    (URL.contains("sslmode") ? ", ssl=explicit" : ", ssl=default"));
+            connection = DriverManager.getConnection(URL, USER, PASS);
+            connection.setAutoCommit(true);
+            System.out.println("[DB] Connected to " + URL);
+        } catch (SQLException | ClassNotFoundException e) {
+            throw new RuntimeException("[DB] Connection error: " + e.getMessage(), e);
+        }
+    }
+
+    public static Connection getConnection() throws SQLException {
+        if (connection == null || connection.isClosed())
+            throw new IllegalStateException("DB is not connected. Call connect() first.");
+        return connection;
+    }
+
+    public static void closeQuiet() { try { if (connection != null) connection.close(); } catch (Exception ignore) {} }
+
+
+    public static long register(String login, String rawPassword) throws SQLException {
+        try (PreparedStatement ps = connection.prepareStatement(SQL_INSERT_USER)) {
+            ps.setString(1, login);
+            ps.setString(2, md2Hex(rawPassword));
+            try (ResultSet rs = ps.executeQuery()) { rs.next(); return rs.getLong(1); }
+        }
+    }
+
+    public static Optional<Long> authenticate(String login, String rawPassword) throws SQLException {
+        try (PreparedStatement ps = connection.prepareStatement(SQL_FIND_USER_BY_LOGIN)) {
+            ps.setString(1, login);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (!rs.next()) return Optional.empty();
+                String dbHash = rs.getString("pass_md2_hex");
+                return md2Hex(rawPassword).equalsIgnoreCase(dbHash)
+                        ? Optional.of(rs.getLong("id")) : Optional.empty();
+            }
+        }
+    }
+
+
+    public static List<Organization> loadAllOrganizations() throws SQLException {
+        List<Organization> out = new ArrayList<>();
+        try (PreparedStatement ps = connection.prepareStatement(SQL_SELECT_ALL_ORG);
+             ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) out.add(mapRowToOrganization(rs));
+        }
+        return out;
+    }
+
+    public static Organization insertOrganization(OrganizationDraft d, long ownerId) throws SQLException {
+        try (PreparedStatement ps = connection.prepareStatement(SQL_INSERT_ORG)) {
+            ps.setString(1, d.name);
+            ps.setInt(2, d.coordinates.getX());
+            ps.setLong(3, d.coordinates.getY());
+            if (d.annualTurnover == null) ps.setNull(4, Types.INTEGER); else ps.setInt(4, d.annualTurnover);
+            ps.setInt(5, d.employeesCount);
+            ps.setString(6, d.type.name());
+            ps.setString(7, d.officialAddress == null ? null : d.officialAddress.getStreet());
+            ps.setString(8, d.officialAddress == null ? null : d.officialAddress.getZipCode());
+            ps.setLong(9, ownerId);
+
+            try (ResultSet rs = ps.executeQuery()) {
+                rs.next();
+                long id = rs.getLong("id");
+                Timestamp ts = rs.getTimestamp("creation_date");
+                ZonedDateTime created = (ts != null)
+                        ? ts.toInstant().atZone(ZoneId.systemDefault())
+                        : ZonedDateTime.now();
+                return new Organization(id, created, d.name, d.coordinates, d.annualTurnover,
+                        d.employeesCount, d.type, d.officialAddress);
+            }
+        }
+    }
+
+    public static boolean updateOrganization(Organization o, long ownerId) throws SQLException {
+        try (PreparedStatement ps = connection.prepareStatement(SQL_UPDATE_ORG)) {
+            ps.setString(1, o.getName());
+            ps.setInt(2, o.getCoordinates().getX());
+            ps.setLong(3, o.getCoordinates().getY());
+            if (o.getAnnualTurnover() == null) ps.setNull(4, Types.INTEGER); else ps.setInt(4, o.getAnnualTurnover());
+            ps.setInt(5, o.getEmployeesCount());
+            ps.setString(6, o.getType().name());
+            ps.setString(7, o.getOfficialAddress() == null ? null : o.getOfficialAddress().getStreet());
+            ps.setString(8, o.getOfficialAddress() == null ? null : o.getOfficialAddress().getZipCode());
+            ps.setLong(9, o.getId());
+            ps.setLong(10, ownerId);
+            return ps.executeUpdate() == 1;
+        }
+    }
+
+    public static boolean deleteOrganization(long id, long ownerId) throws SQLException {
+        try (PreparedStatement ps = connection.prepareStatement(SQL_DELETE_ORG)) {
+            ps.setLong(1, id);
+            ps.setLong(2, ownerId);
+            return ps.executeUpdate() == 1;
+        }
+    }
+
+    // NEW: найти голову + owner
+    public static Optional<OrgWithOwner> findHead() throws SQLException {
+        try (PreparedStatement ps = connection.prepareStatement(SQL_SELECT_HEAD);
+             ResultSet rs = ps.executeQuery()) {
+            if (!rs.next()) return Optional.empty();
+            Organization org = mapRowToOrganization(rs);
+            long ownerId = rs.getLong("owner_id");
+            return Optional.of(new OrgWithOwner(org, ownerId));
+        }
+    }
+
+    private static final String SQL_FIND_ANY_BY_OWNER_AND_EMP = """
+    SELECT id FROM organization
+    WHERE owner_id = ? AND employees_count = ?
+    ORDER BY id
+    LIMIT 1
+    """;
+
+    public static Optional<Long> findAnyByOwnerAndEmployees(long ownerId, int employeesCount) throws SQLException {
+        try (PreparedStatement ps = connection.prepareStatement(SQL_FIND_ANY_BY_OWNER_AND_EMP)) {
+            ps.setLong(1, ownerId);
+            ps.setInt(2, employeesCount);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (!rs.next()) return Optional.empty();
+                return Optional.of(rs.getLong(1));
+            }
+        }
+    }
+
+
+
+    public static int deleteAllByOwner(long ownerId) throws SQLException {
+        try (PreparedStatement ps = connection.prepareStatement(SQL_DELETE_ALL_BY_OWNER)) {
+            ps.setLong(1, ownerId);
+            return ps.executeUpdate();
+        }
+    }
+
+
+    public static final class OrgWithOwner {
+        public final Organization org;
+        public final long ownerId;
+        public OrgWithOwner(Organization org, long ownerId) {
+            this.org = org; this.ownerId = ownerId;
+        }
+    }
+
+    private static Organization mapRowToOrganization(ResultSet rs) throws SQLException {
+        long id = rs.getLong("id");
+        String name = rs.getString("name");
+        int x = rs.getInt("x");
+        long y = rs.getLong("y");
+        Integer annual = (Integer) rs.getObject("annual_turnover");
+        int employees = rs.getInt("employees_count");
+        OrganizationType type = OrganizationType.valueOf(rs.getString("type"));
+        String street = rs.getString("street");
+        String zip = rs.getString("zip_code");
+        Timestamp ts = rs.getTimestamp("creation_date");
+        ZonedDateTime created = (ts != null)
+                ? ts.toInstant().atZone(ZoneId.systemDefault())
+                : ZonedDateTime.now();
+
+        Coordinates coord = new Coordinates(x, y);
+        Address addr = (street == null && zip == null) ? null : new Address(street, zip);
+        return new Organization(id, created, name, coord, annual, employees, type, addr);
+    }
+
+    public static String md2Hex(String s) {
+        try {
+            MessageDigest md = MessageDigest.getInstance("MD2");
+            byte[] d = md.digest(s.getBytes(StandardCharsets.UTF_8));
+            StringBuilder sb = new StringBuilder(d.length * 2);
+            for (byte b : d) sb.append(String.format("%02x", b));
+            return sb.toString();
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("MD2 not available", e);
+        }
+    }
+
+    private DataBaseManager() {}
+}
+--- End of D:\Proj\ITMOLabs\Lab7\src\main\java\db\DataBaseManager.java ---
+
+--- Start of D:\Proj\ITMOLabs\Lab7\src\main\java\Model\Address.java ---
+package main.java.Model;
+
+/**
+ * Класс, представляющий адрес организации.
+ * Адрес содержит информацию об улице и почтовом индексе.
+ */
+public class Address {
+    private String street;
+    private String zipCode;
+
+    /**
+     * Конструктор для создания объекта Address.
+     *
+     * @param street Улица. Может быть null.
+     * @param zipCode Почтовый индекс. Не может быть null, длина не более 18 символов.
+     * @throws IllegalArgumentException Если zipCode равен null или его длина превышает 18 символов,
+     * или если street задана и пустая.
+     */
+    public Address(String street, String zipCode) {
+        if (zipCode == null || zipCode.length() > 18)
+            throw new IllegalArgumentException("ZipCode не может быть null и должен быть <= 18 символов");
+        if (street != null && street.trim().isEmpty())
+            throw new IllegalArgumentException("Улица, если задана, не может быть пустой");
+
+        this.street = street;
+        this.zipCode = zipCode;
+    }
+
+    /**
+     * Получает значение поля street (улица).
+     *
+     * @return Значение улицы или null, если оно не задано.
+     */
+    public String getStreet() {
+        return street;
+    }
+
+    /**
+     * Получает значение поля zipCode (почтовый индекс).
+     *
+     * @return Почтовый индекс.
+     */
+    public String getZipCode() {
+        return zipCode;
+    }
+}
+--- End of D:\Proj\ITMOLabs\Lab7\src\main\java\Model\Address.java ---
+
+--- Start of D:\Proj\ITMOLabs\Lab7\src\main\java\Model\Coordinates.java ---
+package main.java.Model;
+
+/**
+ * Класс, представляющий координаты организации.
+ * Координаты содержат два значения: X и Y.
+ */
+public class Coordinates {
+    private Integer x;
+    private Long y;
+
+    /**
+     * Конструктор для создания объекта Coordinates.
+     *
+     * @param x Координата X.
+     * @param y Координата Y.
+     * @throws IllegalArgumentException Если x или y равны null.
+     */
+    public Coordinates(Integer x, Long y) {
+        if (x == null || y == null)
+            throw new IllegalArgumentException("Координаты не могут быть null");
+        this.x = x;
+        this.y = y;
+    }
+
+    /**
+     * Получает значение координаты X.
+     *
+     * @return Координата X.
+     */
+    public Integer getX() {
+        return x;
+    }
+
+    /**
+     * Получает значение координаты Y.
+     *
+     * @return Координата Y.
+     */
+    public Long getY() {
+        return y;
+    }
+}
+--- End of D:\Proj\ITMOLabs\Lab7\src\main\java\Model\Coordinates.java ---
+
+--- Start of D:\Proj\ITMOLabs\Lab7\src\main\java\Model\IdGenerator.java ---
+package main.java.Model;
+
+import java.util.concurrent.atomic.AtomicLong;
+
+public class IdGenerator {
+    private static final AtomicLong counter = new AtomicLong(1);
+
+    public static Long generateId() {
+        return counter.getAndIncrement();
+    }
+
+    /**
+     * Обновляет значение счетчика, если переданное больше текущего.
+     * Нужно вызывать после загрузки коллекции, чтобы избежать дублирования ID.
+     *
+     * @param maxId максимальное существующее значение id
+     */
+    public static void updateCounter(long maxId) {
+        counter.updateAndGet(current -> Math.max(current, maxId + 1));
+    }
+}
+--- End of D:\Proj\ITMOLabs\Lab7\src\main\java\Model\IdGenerator.java ---
+
+--- Start of D:\Proj\ITMOLabs\Lab7\src\main\java\Model\Organization.java ---
+package main.java.Model;
+
+import java.time.ZonedDateTime;
+
+/**
+ * Доменная модель организации.
+ * id и creationDate приходят из БД (INSERT ... RETURNING).
+ */
+public class Organization implements Comparable<Organization> {
+    private final Long id;
+    private final ZonedDateTime creationDate;
+
+    private String name;
+    private Coordinates coordinates;
+    private Integer annualTurnover;     // может быть null
+    private int employeesCount;         // > 0
+    private OrganizationType type;      // != null
+    private Address officialAddress;    // может быть null
+
+    public Organization(Long id,
+                        ZonedDateTime creationDate,
+                        String name,
+                        Coordinates coordinates,
+                        Integer annualTurnover,
+                        int employeesCount,
+                        OrganizationType type,
+                        Address officialAddress) {
+
+        if (id == null || id <= 0) throw new IllegalArgumentException("ID должен быть положительным");
+        if (creationDate == null)      throw new IllegalArgumentException("creationDate не может быть null");
+        if (name == null || name.trim().isEmpty()) throw new IllegalArgumentException("Имя не может быть пустым");
+        if (coordinates == null)       throw new IllegalArgumentException("Координаты не могут быть null");
+        if (employeesCount <= 0)       throw new IllegalArgumentException("employeesCount должен быть > 0");
+        if (type == null)              throw new IllegalArgumentException("Тип организации не может быть null");
+        if (annualTurnover != null && annualTurnover <= 0)
+            throw new IllegalArgumentException("annualTurnover, если задан, должен быть > 0");
+
+        this.id = id;
+        this.creationDate = creationDate;
+        this.name = name;
+        this.coordinates = coordinates;
+        this.annualTurnover = annualTurnover;
+        this.employeesCount = employeesCount;
+        this.type = type;
+        this.officialAddress = officialAddress;
+    }
+
+    // -------- getters --------
+    public Long getId() { return id; }
+    public ZonedDateTime getCreationDate() { return creationDate; }
+    public String getName() { return name; }
+    public Coordinates getCoordinates() { return coordinates; }
+    public Integer getAnnualTurnover() { return annualTurnover; }
+    public int getEmployeesCount() { return employeesCount; }
+    public OrganizationType getType() { return type; }
+    public Address getOfficialAddress() { return officialAddress; }
+
+    // -------- setters (для update) --------
+    public void setName(String name) { this.name = name; }
+    public void setCoordinates(Coordinates coordinates) { this.coordinates = coordinates; }
+    public void setAnnualTurnover(Integer annualTurnover) { this.annualTurnover = annualTurnover; }
+    public void setEmployeesCount(int employeesCount) { this.employeesCount = employeesCount; }
+    public void setType(OrganizationType type) { this.type = type; }
+    public void setOfficialAddress(Address officialAddress) { this.officialAddress = officialAddress; }
+
+    // Для add_if_max / add_if_min сравниваем по employeesCount
+    @Override
+    public int compareTo(Organization other) {
+        return Integer.compare(this.employeesCount, other.employeesCount);
+    }
+
+    @Override
+    public String toString() {
+        String street = (officialAddress != null ? officialAddress.getStreet() : "null");
+        String zip    = (officialAddress != null ? officialAddress.getZipCode() : "null");
+
+
+        java.time.format.DateTimeFormatter fmt =
+                java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm:ss");
+
+        return "Organization{" +
+                "id=" + id +
+                ", creationDate=" + creationDate.format(fmt) +
+                ", name='" + name + '\'' +
+                ", coordinates=(" + coordinates.getX() + ", " + coordinates.getY() + ")" +
+                ", annualTurnover=" + (annualTurnover == null ? "null" : annualTurnover) +
+                ", employeesCount=" + employeesCount +
+                ", type=" + type +
+                ", street='" + street + '\'' +
+                ", zipCode='" + zip + '\'' +
+                '}';
+    }
+
+}
+--- End of D:\Proj\ITMOLabs\Lab7\src\main\java\Model\Organization.java ---
+
+--- Start of D:\Proj\ITMOLabs\Lab7\src\main\java\Model\OrganizationDraft.java ---
+package main.java.Model;
+
+public class OrganizationDraft {
+    public String name;
+    public Coordinates coordinates;
+    public Integer annualTurnover;
+    public int employeesCount;
+    public OrganizationType type;
+    public Address officialAddress;
+
+    public OrganizationDraft() {}
+
+    public OrganizationDraft(String name, Coordinates coordinates, Integer annualTurnover,
+                             int employeesCount, OrganizationType type, Address officialAddress) {
+        this.name = name;
+        this.coordinates = coordinates;
+        this.annualTurnover = annualTurnover;
+        this.employeesCount = employeesCount;
+        this.type = type;
+        this.officialAddress = officialAddress;
+    }
+}
+--- End of D:\Proj\ITMOLabs\Lab7\src\main\java\Model\OrganizationDraft.java ---
+
+--- Start of D:\Proj\ITMOLabs\Lab7\src\main\java\Model\OrganizationType.java ---
+package main.java.Model;
+
+/**
+ * Перечисление типов организаций.
+ * Содержит три возможных типа:
+ * - COMMERCIAL
+ * - PUBLIC
+ * - PRIVATE_LIMITED_COMPANY
+ */
+public enum OrganizationType {
+    COMMERCIAL,
+    PUBLIC,
+    PRIVATE_LIMITED_COMPANY
+}
+--- End of D:\Proj\ITMOLabs\Lab7\src\main\java\Model\OrganizationType.java ---
+
+--- Start of D:\Proj\ITMOLabs\Lab7\src\main\java\service\Server.java ---
+package main.java.service;
+
+import main.java.Commands.CommandManager;
+import main.java.Model.Organization;
+import main.java.Storage.CollectionManager;
+import main.java.client.ClientHandler;
+import main.java.db.DataBaseManager;
+
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.nio.channels.ServerSocketChannel;
+import java.nio.channels.SocketChannel;
+import java.sql.SQLException;
+import java.util.List;
+import java.util.Scanner;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+public class Server {
+    private final int port;
+    private CollectionManager collectionManager;
+    private CommandManager commandManager;
+
+    private ExecutorService processPool;
+    private ExecutorService sendPool;
+
+    public Server(int port) {
+        this.port = port;
+    }
+
+    public void start() {
+        try {
+
+            DataBaseManager.connect();
+
+
+            List<Organization> loaded = DataBaseManager.loadAllOrganizations();
+            System.out.println("Loaded " + loaded.size() + " organizations from DB");
+            collectionManager = new CollectionManager(loaded);
+
+
+            commandManager = new CommandManager(collectionManager, null);
+
+
+            processPool = Executors.newCachedThreadPool();
+            sendPool = Executors.newFixedThreadPool(4);
+
+
+            ServerSocketChannel serverChannel = ServerSocketChannel.open();
+            serverChannel.socket().bind(new InetSocketAddress(port));
+            System.out.println("Server started on port " + port);
+
+
+            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+                try {
+                    System.out.println("Shutting down pools and DB...");
+                    if (processPool != null) processPool.shutdownNow();
+                    if (sendPool != null) sendPool.shutdownNow();
+                } finally {
+                    DataBaseManager.closeQuiet();
+                    try {
+                        serverChannel.close();
+                    } catch (IOException ignore) {
+                    }
+                }
+            }));
+
+
+            Thread consoleThread = new Thread(this::handleServerConsole);
+            consoleThread.setDaemon(true);
+            consoleThread.start();
+
+
+            while (true) {
+                SocketChannel clientChannel = serverChannel.accept();
+                System.out.println("New client connected: " + clientChannel.socket().getInetAddress());
+                ClientHandler handler = new ClientHandler(clientChannel.socket(), commandManager, processPool, sendPool);
+                new Thread(handler, "reader-" + clientChannel.socket().getPort()).start();
+            }
+        } catch (IOException | SQLException e) {
+            System.err.println("Server error: " + e.getMessage());
+        }
+    }
+
+    private void handleServerConsole() {
+        Scanner scanner = new Scanner(System.in);
+        while (true) {
+            System.out.print("Server> ");
+            String cmd = scanner.nextLine().trim().toLowerCase();
+            switch (cmd) {
+                case "exit" -> {
+                    System.out.println("Завершение работы сервера...");
+                    System.exit(0);
+                }
+                default -> System.out.println("Неизвестная команда сервера. Доступные: exit");
+            }
+        }
+    }
+
+    public static void main(String[] args) {
+        int port = 8082;
+        new Server(port).start();
+    }
+}
+--- End of D:\Proj\ITMOLabs\Lab7\src\main\java\service\Server.java ---
+
+--- Start of D:\Proj\ITMOLabs\Lab7\src\main\java\Storage\CollectionManager.java ---
+package main.java.Storage;
+
+import main.java.Model.Organization;
+
+import java.time.ZonedDateTime;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.PriorityQueue;
+import java.util.stream.Collectors;
+
+public class CollectionManager {
+    private final Collection<Organization> store =
+            java.util.Collections.synchronizedCollection(new PriorityQueue<Organization>());
+    private final ZonedDateTime initTime = ZonedDateTime.now();
+
+    public CollectionManager() {
+    }
+
+    public CollectionManager(List<Organization> loaded) {
+        synchronized (store) {
+            store.addAll(loaded);
+        }
+    }
+
+    public void replaceAll(List<Organization> fresh) {
+        synchronized (store) {
+            store.clear();
+            store.addAll(fresh);
+        }
+    }
+
+    public Organization getById(long id) {
+        synchronized (store) {
+            for (Organization o : store) if (o.getId() == id) return o;
+            return null;
+        }
+    }
+
+    public boolean removeById(long id) {
+        synchronized (store) {
+            return store.removeIf(o -> o.getId() == id);
+        }
+    }
+
+    public List<Organization> getAsList() {
+        synchronized (store) {
+            return new ArrayList<>(store);
+        }
+    }
+
+    public void add(Organization org) {
+        synchronized (store) {
+            store.add(org);
+        }
+    }
+
+    public String show() {
+        synchronized (store) {
+            if (store.isEmpty()) return "Коллекция пуста.";
+            return store.stream().map(Organization::toString).collect(Collectors.joining("\n"));
+        }
+    }
+
+    public Organization removeHead() {
+        synchronized (store) {
+            if (store.isEmpty()) return null;
+            Organization min = null;
+            for (Organization o : store) if (min == null || o.compareTo(min) < 0) min = o;
+            if (min != null) store.remove(min);
+            return min;
+        }
+    }
+
+    public boolean isMax(Organization c) {
+        synchronized (store) {
+            for (Organization o : store) if (c.compareTo(o) <= 0) return false;
+            return true;
+        }
+    }
+
+    public boolean isMin(Organization c) {
+        synchronized (store) {
+            for (Organization o : store) if (c.compareTo(o) >= 0) return false;
+            return true;
+        }
+    }
+
+    public boolean removeAnyByEmployeesCount(int n) {
+        synchronized (store) {
+            for (Organization o : store)
+                if (o.getEmployeesCount() == n) {
+                    store.remove(o);
+                    return true;
+                }
+            return false;
+        }
+    }
+
+    public String filterByAnnualTurnover(int t) {
+        synchronized (store) {
+            for (Organization o : store)
+                if (o.getAnnualTurnover() != null && o.getAnnualTurnover() == t) return o.toString();
+            return "Нет организаций с annualTurnover = " + t;
+        }
+    }
+
+    public boolean removeFirst() {
+        return removeHead() != null;
+    }
+
+    public int sizeInt() {
+        synchronized (store) {
+            return store.size();
+        }
+    }
+
+    public String size() {
+        return String.valueOf(sizeInt());
+    }
+
+    public String clear() {
+        synchronized (store) {
+            store.clear();
+        }
+        return "Коллекция очищена";
+    }
+
+    public boolean updateByIdBool(long id, Organization upd) {
+        synchronized (store) {
+            Organization rm = null;
+            for (Organization o : store)
+                if (o.getId() == id) {
+                    rm = o;
+                    break;
+                }
+            if (rm == null) return false;
+            store.remove(rm);
+            store.add(upd);
+            return true;
+        }
+    }
+
+    public String updateById(long id, Organization upd) {
+        return updateByIdBool(id, upd) ? "true" : "false";
+    }
+
+    public String info() {
+        synchronized (store) {
+            java.time.format.DateTimeFormatter fmt =
+                    java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm:ss");
+
+            return "Тип коллекции: PriorityQueue\n" +
+                    "Дата инициализации: " + initTime.format(fmt) + "\n" +
+                    "Количество элементов: " + store.size();
+        }
+    }
+}
+--- End of D:\Proj\ITMOLabs\Lab7\src\main\java\Storage\CollectionManager.java ---
+
+--- Start of D:\Proj\ITMOLabs\Lab7\src\main\java\Utils\InputHelper.java ---
+package main.java.Utils;
+
+import java.util.Scanner;
+
+/**
+ * Утилита для последовательного и корректного интерактивного ввода данных пользователем.
+ */
+public class InputHelper {
+    private final Scanner scanner;
+
+    public InputHelper(Scanner scanner) {
+        this.scanner = scanner;
+    }
+
+    /**
+     * Читает строку с приглашением, проверяет, что строка не пустая если allowEmpty == false.
+     * Если пустая, просит ввести заново.
+     *
+     * @param prompt     приглашение для пользователя
+     * @param allowEmpty разрешить ли пустую строку (которая будет интерпретироваться как null)
+     * @return введённая строка или null (если пустая и allowEmpty == true)
+     */
+    public String readString(String prompt, boolean allowEmpty) {
+        while (true) {
+            System.out.print(prompt);
+            String input = scanner.nextLine().trim();
+            if (input.isEmpty()) {
+                if (allowEmpty) {
+                    return null;
+                } else {
+                    System.out.println("Это поле не может быть пустым. Попробуйте снова.");
+                }
+            } else {
+                return input;
+            }
+        }
+    }
+
+    /**
+     * Читает целое число с приглашением.
+     * Проверяет, что число положительное, если positiveOnly == true.
+     *
+     * @param prompt      приглашение
+     * @param positiveOnly если true, значение должно быть больше 0
+     * @return введённое число
+     */
+    public int readInt(String prompt, boolean positiveOnly) {
+        while (true) {
+            System.out.print(prompt);
+            String input = scanner.nextLine().trim();
+            try {
+                int val = Integer.parseInt(input);
+                if (positiveOnly && val <= 0) {
+                    System.out.println("Число должно быть положительным. Попробуйте снова.");
+                } else {
+                    return val;
+                }
+            } catch (NumberFormatException e) {
+                System.out.println("Введите корректное целое число.");
+            }
+        }
+    }
+
+    /**
+     * Читает число типа long с приглашением.
+     *
+     * @param prompt приглашение
+     * @return введённое число
+     */
+    public long readLong(String prompt) {
+        while (true) {
+            System.out.print(prompt);
+            String input = scanner.nextLine().trim();
+            try {
+                return Long.parseLong(input);
+            } catch (NumberFormatException e) {
+                System.out.println("Введите корректное число.");
+            }
+        }
+    }
+
+    /**
+     * Читает значение enum с приглашением.
+     * Выводит список всех возможных значений.
+     *
+     * @param prompt    приглашение
+     * @param enumClass класс enum
+     * @param <E>       тип enum
+     * @return выбранное значение enum
+     */
+    public <E extends Enum<E>> E readEnum(String prompt, Class<E> enumClass) {
+        E[] constants = enumClass.getEnumConstants();
+        System.out.println("Возможные значения:");
+        for (E constant : constants) {
+            System.out.println(" - " + constant.name());
+        }
+        while (true) {
+            System.out.print(prompt);
+            String input = scanner.nextLine().trim().toUpperCase();
+            try {
+                return Enum.valueOf(enumClass, input);
+            } catch (IllegalArgumentException e) {
+                System.out.println("Введите одно из указанных значений.");
+            }
+        }
+    }
+}
+--- End of D:\Proj\ITMOLabs\Lab7\src\main\java\Utils\InputHelper.java ---
+
+--- Start of D:\Proj\ITMOLabs\Lab7\src\main\java\Utils\JsonHandler.java ---
+package main.java.Utils;
+
+import main.java.Model.Organization;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.reflect.TypeToken;
+
+import java.io.*;
+import java.lang.reflect.Type;
+import java.time.ZonedDateTime;
+import java.util.List;
+
+/**
+ * Утилитарный класс для работы с JSON-файлами, содержащими коллекции организаций.
+ * Использует библиотеку Gson для сериализации и десериализации.
+ */
+public class JsonHandler {
+    public static final Gson gson = new GsonBuilder()
+            .registerTypeAdapter(ZonedDateTime.class, new ZonedDateTimeAdapter())
+            .setPrettyPrinting()
+            .create();
+
+    /**
+     * Загружает список организаций из JSON-файла.
+     *
+     * @param filePath путь к JSON-файлу.
+     * @return список организаций.
+     * @throws IOException в случае ошибки чтения файла.
+     */
+    public static List<Organization> loadFromFile(String filePath) throws IOException {
+        try (BufferedReader reader = new BufferedReader(new FileReader(filePath))) {
+            Type listType = new TypeToken<List<Organization>>() {}.getType();
+            return gson.fromJson(reader, listType);
+        }
+    }
+
+    /**
+     * Сохраняет список организаций в JSON-файл.
+     *
+     * @param organizations список организаций для сохранения.
+     * @param filePath путь к JSON-файлу.
+     * @throws IOException в случае ошибки записи файла.
+     */
+    public static void saveToFile(List<Organization> organizations, String filePath) throws IOException {
+        try (Writer writer = new OutputStreamWriter(new FileOutputStream(filePath))) {
+            gson.toJson(organizations, writer);
+        }
+    }
+}
+--- End of D:\Proj\ITMOLabs\Lab7\src\main\java\Utils\JsonHandler.java ---
+
+--- Start of D:\Proj\ITMOLabs\Lab7\src\main\java\Utils\ZonedDateTimeAdapter.java ---
+package main.java.Utils;
+
+import com.google.gson.*;
+import java.lang.reflect.Type;
+import java.time.ZonedDateTime;
+
+/**
+ * Адаптер для сериализации и десериализации объекта ZonedDateTime
+ * в/из JSON формата ISO 8601 при помощи библиотеки Gson.
+ */
+public class ZonedDateTimeAdapter implements JsonSerializer<ZonedDateTime>, JsonDeserializer<ZonedDateTime> {
+
+    /**
+     * Сериализует объект ZonedDateTime в JSON строку в формате ISO 8601.
+     *
+     * @param src исходный объект ZonedDateTime.
+     * @param typeOfSrc тип исходного объекта.
+     * @param context контекст сериализации.
+     * @return JSON элемент с текстовым представлением даты и времени.
+     */
+    @Override
+    public JsonElement serialize(ZonedDateTime src, Type typeOfSrc, JsonSerializationContext context) {
+        return new JsonPrimitive(src.toString());
+    }
+
+    /**
+     * Десериализует JSON элемент в объект ZonedDateTime.
+     *
+     * @param json JSON элемент с датой и временем в формате ISO 8601.
+     * @param typeOfT тип результата.
+     * @param context контекст десериализации.
+     * @return объект ZonedDateTime.
+     * @throws JsonParseException если строка не может быть распарсена в ZonedDateTime.
+     */
+    @Override
+    public ZonedDateTime deserialize(JsonElement json, Type typeOfT, JsonDeserializationContext context) throws JsonParseException {
+        return ZonedDateTime.parse(json.getAsString());
+    }
+}
+--- End of D:\Proj\ITMOLabs\Lab7\src\main\java\Utils\ZonedDateTimeAdapter.java ---
+

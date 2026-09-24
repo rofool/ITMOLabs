@@ -1,0 +1,8 @@
+add {"name":"A1","coordinates":{"x":10,"y":20},"annualTurnover":1000,"employeesCount":5,"type":"PUBLIC","officialAddress":{"street":"Main","zipCode":"12345"}}
+add {"name":"A2","coordinates":{"x":11,"y":21},"annualTurnover":2000,"employeesCount":7,"type":"COMMERCIAL","officialAddress":{"street":"Side","zipCode":"54321"}}
+show
+filter_by_annual_turnover 1000
+print_field_descending_type
+remove_by_id 1
+remove_any_by_employees_count 7
+info
