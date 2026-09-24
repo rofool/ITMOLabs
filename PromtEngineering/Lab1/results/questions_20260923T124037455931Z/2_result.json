@@ -1,0 +1,18 @@
+{
+  "timestamp_utc": "2026-09-23T12:40:42.293913+00:00",
+  "model": "qwen/qwen3.8-27b",
+  "question_id": "direct",
+  "question": "Какие операции изменения данных могут замедляться из-за необходимости обновлять индексы?",
+  "temperature": 0.2,
+  "status": "ok",
+  "error": "",
+  "answer": "Согласно тексту, из-за необходимости обновлять индексы могут замедляться операции **INSERT**, **UPDATE** и **DELETE**.",
+  "elapsed_seconds": 0.415,
+  "chars": 118,
+  "words": 13,
+  "numbers": 0,
+  "caution_markers": 0,
+  "prompt_tokens": 1000,
+  "completion_tokens": 33,
+  "total_tokens": 1033
+}

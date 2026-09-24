@@ -1,0 +1,37 @@
+{
+  "id": "chatcmpl-1690f8d4-e6a4-4dc3-be2b-142bd6ec5b71",
+  "object": "chat.completion",
+  "created": 1790164248,
+  "model": "openai/gpt-oss-20b",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "Индекс в реляционной базе – это вспомогательная структура, похожая на оглавление книги. Он хранит значения столбца (или их комбинацию) и указатели на строки, где эти значения находятся.  \n\n**Для чего нужен?**  \nИндекс ускоряет поиск, сортировку и соединения по указанному столбцу, избавляя от полного сканирования таблицы.\n\n**Пример**  \nТаблица `Пользователи` с полем `email`. Создаём индекс `idx_email`. При запросе `SELECT * FROM Пользователи WHERE email='alice@example.com'` СУБД быстро ищет нужный адрес через индекс, а не перебирает все строки.\n\n**Преимущества**  \n- Быстрый поиск, особенно в больших таблицах.\n\n**Недостатки**  \n- Дополнительное место на диске и время на обновление индекса при вставке/удалении/обновлении строк.",
+        "reasoning": "We need to answer in Russian, no more than 150 words. Explain what an index is in relational DB, why needed, give one clear example, mention advantage and disadvantage. Keep within 150 words. Let's craft ~120 words."
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "queue_time": 0.171489483,
+    "prompt_tokens": 125,
+    "prompt_time": 0.008374426,
+    "completion_tokens": 260,
+    "completion_time": 0.275836631,
+    "total_tokens": 385,
+    "total_time": 0.284211057,
+    "completion_tokens_details": {
+      "reasoning_tokens": 49
+    }
+  },
+  "usage_breakdown": null,
+  "system_fingerprint": "fp_228717f27c",
+  "x_groq": {
+    "id": "req_01m371n97yeq9v6ex8f0dxbgkk",
+    "seed": 1799528113
+  },
+  "service_tier": "on_demand"
+}

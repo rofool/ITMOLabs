@@ -1,0 +1,37 @@
+{
+  "id": "chatcmpl-f706b939-1d03-4655-8c2b-3da0613766a0",
+  "object": "chat.completion",
+  "created": 1790166596,
+  "model": "openai/gpt-oss-20b",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "Индексы – ключевой механизм ускорения запросов в реляционных БД. Без них СУБД часто делает полный скан таблицы, что неприемлемо при миллионах строк. Индекс хранит значения столбцов и ссылки на строки, позволяя быстро находить нужные записи, как указатель в книге. Наиболее распространённая реализация – B‑дерево, которое эффективно ищет, вставляет и удаляет элементы. Индексы особенно полезны для условий WHERE, JOIN, ORDER BY и группировок.\n\nПример: таблица `users` с миллионами записей. Поиск по `email` без индекса требует просмотра почти всей таблицы, а индекс по `email` резко ускоряет запрос. Однако индекс не гарантирует ускорения: оптимизатор может выбрать полный скан, если запрос возвращает большую часть таблицы. Индексы занимают место и обновляются при INSERT/UPDATE/DELETE, поэтому их избыточное количество замедляет запись.\n\nПоэтому индексы создают осознанно: обычно только часто используемые в поиске, соединениях и сортировках столбцы. Составные индексы требуют правильного порядка полей. Анализ планов выполнения помогает понять, действительно ли новый индекс улучшит производительность.\n\nИндекс – мощный инструмент, но не универсальный; баланс между чтением, записью и ресурсами критичен.",
+        "reasoning": "We need to shorten to about 20% of original length. Original text length: let's estimate. The text is about 800-900 words? Let's count roughly: The text has many paragraphs. Let's approximate 800 words. 20% would be 160 words. We need to keep main meaning and important details. So produce a concise summary ~150-170 words.\n\nWe need to keep key points: indexes optimize DB, full table scan, B-tree, useful for WHERE, JOIN, ORDER BY, example users table, index may not always help, optimizer decides, indexes consume space and need updates, too many indexes slow writes, choose wisely, composite indexes, order matters, analyze execution plans, indexes are not universal, balance read/write.\n\nLet's craft ~170 words.\n\nLet's produce final answer."
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "queue_time": 0.089035275,
+    "prompt_tokens": 1004,
+    "prompt_time": 0.055878588,
+    "completion_tokens": 471,
+    "completion_time": 0.535600982,
+    "total_tokens": 1475,
+    "total_time": 0.59147957,
+    "completion_tokens_details": {
+      "reasoning_tokens": 163
+    }
+  },
+  "usage_breakdown": null,
+  "system_fingerprint": "fp_e99e93f2ac",
+  "x_groq": {
+    "id": "req_01m373wydcehmswxsgxwy0mvef",
+    "seed": 1978124149
+  },
+  "service_tier": "on_demand"
+}

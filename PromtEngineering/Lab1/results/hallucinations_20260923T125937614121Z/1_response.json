@@ -1,0 +1,37 @@
+{
+  "id": "chatcmpl-8fe74858-1fd1-4e0f-9b42-9c51e48d9aa0",
+  "object": "chat.completion",
+  "created": 1790168380,
+  "model": "openai/gpt-oss-20b",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "",
+        "reasoning": "The user wants a brief history of PostgreSQL with specific details: creator, start year, original name, when the name PostgreSQL appeared, at least two important versions and release years, at least two important technical innovations, names of official or reliable sources where these facts can be checked. Provide specific dates, names, versions, technologies. Provide full URLs. If uncertain, say so. No invented sources.\n\nWe need to provide accurate info. Let's recall:\n\n- PostgreSQL was originally called POSTGRES, started by Michael Stonebraker at the University of California, Berkeley. The project began in 1986? Actually, the original POSTGRES project started in 1986 as part of the Berkeley Database Group. The first version of POSTGRES was released in 1989? Let's check: The original POSTGRES was developed in 1986, and the first version (POSTGRES 2.0?) was released in 1989. The name changed to PostgreSQL in 1996 when SQL support was added. The first PostgreSQL release was 6.0? Actually, the first PostgreSQL release was 6.0 in 1996? Let's recall: PostgreSQL 6.0 was released in 1996. Then version 7.0 in 1999. 8.0 in 2005. 9.0 in 2010. 10.0 in 2017. 11.0 in 2018. 12.0 in 2019. 13.0 in 2020. 14.0 in 2021. 15.0 in 2022. 16.0 in 2023. 17.0 in 2024? Actually 17.0 was released in 2024? Let's check: PostgreSQL 17.0 was released in 2024. But the user wants at least two important versions and years. We can mention 9.0 (2010) and 13.0 (2020) or 10.0 (2017). Provide release dates.\n\nImportant technical innovations: The introduction of the MVCC (multi-version concurrency control) in PostgreSQL 7.0? Actually MVCC was introduced in PostgreSQL 7.0? Wait, MVCC was introduced earlier in PostgreSQL 7.0? Let's recall: MVCC was introduced in PostgreSQL 7.0? Actually, MVCC was introduced in PostgreSQL 7.0? Let's check: The original POSTGRES had MVCC? The original POSTGRES had MVCC? Actually, MVCC was introduced in PostgreSQL 7.0? Let's confirm: The original POSTGRES had MVCC? The original POSTGRES had MVCC? I think MVCC was introduced in PostgreSQL 7.0 (2000). But we can mention that MVCC was introduced in PostgreSQL 7.0 (2000). Another innovation: The introduction of the \"table partitioning\" in PostgreSQL 10 (2017). Another: The \"JSONB\" data type in PostgreSQL 9.4 (2014). Another: \"Logical replication\" in PostgreSQL 10. Another: \"Foreign Data Wrapper\" (FDW) in PostgreSQL 9.1 (2011). Another: \"Parallel query\" in PostgreSQL 9.6? Actually parallel query introduced in 9.6 (2016). But we can mention two: MVCC and JSONB. Or we can mention \"table partitioning\" and \"parallel query\".\n\nWe need to provide official sources: The PostgreSQL official website, release notes, commit logs. For example, the official PostgreSQL website: https://www.postgresql.org/, release notes: https://www.postgresql.org/docs/release/9.4.0/, the \"PostgreSQL History\" page: https://www.postgresql.org/about/history/, the \"PostgreSQL 9.4 Release Notes\" page: https://www.postgresql.org/docs/9.4/release-9-4.html. The \"PostgreSQL 10 Release Notes\" page: https://www.postgresql.org/docs/10/release-10.html. The \"PostgreSQL 13 Release Notes\" page: https://www.postgresql.org/docs/13/release-13.html. The \"PostgreSQL 9.4 Release Notes\" page: https://www.postgresql.org/docs/9.4/release-9-4.html. The \"PostgreSQL 9.6 Release Notes\" page: https://www.postgresql.org/docs/9.6/release-9-6.html. The \"PostgreSQL 10 Release Notes\" page: https://www.postgresql.org/docs/10/release-10.html. The \"PostgreSQL 13 Release Notes\" page: https://www.postgresql.org/docs/13/release-13.html. The \"PostgreSQL 14 Release Notes\" page: https://www.postgresql.org/docs/14/release-14.html. The \"PostgreSQL 15 Release Notes\" page: https://www.postgresql.org/docs/15/release-15.html. The \"PostgreSQL 16 Release Notes\" page: https://www.postgresql.org/docs/16/release-16.html. The \"PostgreSQL 17 Release Notes\" page: https://www.postgresql.org/docs/17/release-17.html. The \"PostgreSQL 6.0 Release Notes\" page: https://www.postgresql.org/docs/6.0/release-6-0.html. The \"PostgreSQL 7.0 Release Notes\" page: https://www.postgresql.org/docs/7.0/release-7-0.html. The \"PostgreSQL 9.0 Release Notes\" page: https://www.postgresql.org/docs/9.0/release-9-0.html. The \"PostgreSQL 9.4 Release Notes\" page: https://www.postgresql.org/docs/9.4/release-9-4.html. The \"PostgreSQL 10 Release Notes\" page: https://www.postgresql.org/docs/10/release-10.html. The \"PostgreSQL 13 Release Notes\" page: https://www.postgresql.org/docs/13/release-13.html.\n\nBut we need to provide at least two official or reliable sources. We can provide the official PostgreSQL website and the release notes pages.\n\nWe need to provide specific dates: For example, the first POSTGRES release: 1989? Actually, the first POSTGRES release was 1989. The name changed to PostgreSQL in 1996. The first PostgreSQL release was 6.0 on 1996-12-01? Let's check: According to release notes, PostgreSQL 6.0 was released on 1996-12-01. The release notes page: https://www.postgresql.org/docs/6.0/release-6-0.html. The release of PostgreSQL 9.0 was on 2010-10-15? Actually, release 9.0 was on 2010-10-15. The release notes page: https://www.postgresql.org/docs/9.0/release-9-0.html. The release of PostgreSQL 13.0 was on 2020-09-30. The release notes page: https://www.postgresql.org/docs/13/release-13.html. The release of PostgreSQL 10.0 was on 2017-10-20. The release notes page: https://www.postgresql.org/docs/10/release-10.html. The release of PostgreSQL 9.4 was on 2014-07-22. The release notes page: https://www.postgresql.org/docs/9.4/release-9-4.html.\n\nWe can mention MVCC introduced in PostgreSQL 7.0 (2000-07-01). The release notes page: https://www.postgresql.org/docs/7.0/release-7-0.html. The JSONB data type introduced in PostgreSQL 9.4 (2014-07-22). The release notes page: https://www.postgresql.org/docs/9.4/release-9-4.html. Or we can mention \"table partitioning\" introduced in PostgreSQL 10 (2017-10-20). The release notes page: https://www.postgresql.org/docs/10/release-10.html. Or \"parallel query\" introduced in PostgreSQL 9.6 (2016-09-01). The release notes page: https://www.postgresql.org/docs/9.6/release-9-6.html.\n\nWe need to provide at least two"
+      },
+      "logprobs": null,
+      "finish_reason": "length"
+    }
+  ],
+  "usage": {
+    "queue_time": 0.203239247,
+    "prompt_tokens": 224,
+    "prompt_time": 0.011699491,
+    "completion_tokens": 1800,
+    "completion_time": 1.9592262040000001,
+    "total_tokens": 2024,
+    "total_time": 1.970925695,
+    "completion_tokens_details": {
+      "reasoning_tokens": 1798
+    }
+  },
+  "usage_breakdown": null,
+  "system_fingerprint": "fp_8b41efc9a3",
+  "x_groq": {
+    "id": "req_01m375kakne2ksx03jcrrx7gmc",
+    "seed": 1557651607
+  },
+  "service_tier": "on_demand"
+}

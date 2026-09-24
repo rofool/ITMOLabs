@@ -1,0 +1,33 @@
+{
+  "id": "chatcmpl-c4bd4f9a-59c8-4d26-9003-7b6c2cbda7fd",
+  "object": "chat.completion",
+  "created": 1790168178,
+  "model": "qwen/qwen3.8-27b",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\n  \"definition\": \"Дополнительная структура данных, которая хранит значения одного или нескольких столбцов таблицы и информацию, позволяющую быстро определить расположение соответствующих строк.\",\n  \"purpose\": \"Оптимизация работы реляционных баз данных за счет ускорения поиска, вставки и удаления элементов, а также выполнения запросов с условиями WHERE, операциями JOIN, сортировкой ORDER BY и группировкой.\",\n  \"advantage\": \"Существенно повышает скорость чтения данных, позволяя избежать полного сканирования таблицы.\",\n  \"disadvantage\": \"Занимает дополнительное место на диске и замедляет операции изменения данных (INSERT, UPDATE, DELETE) из-за необходимости обновления структуры индекса.\"\n}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "queue_time": 0.047629144,
+    "prompt_tokens": 717,
+    "prompt_time": 0.062825694,
+    "completion_tokens": 161,
+    "completion_time": 0.335268746,
+    "total_tokens": 878,
+    "total_time": 0.39809444
+  },
+  "usage_breakdown": null,
+  "system_fingerprint": "fp_8da23ae6c7",
+  "x_groq": {
+    "id": "req_01m375d7hve1yteraq2g0ffqcp",
+    "seed": 966978628
+  },
+  "service_tier": "on_demand"
+}

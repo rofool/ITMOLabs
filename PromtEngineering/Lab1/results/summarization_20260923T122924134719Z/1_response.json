@@ -1,0 +1,37 @@
+{
+  "id": "chatcmpl-8a9dd965-06fc-484f-92a6-881d752b3432",
+  "object": "chat.completion",
+  "created": 1790166565,
+  "model": "openai/gpt-oss-20b",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "**Краткое резюме:**\n\n- Индексы ускоряют поиск, JOIN‑ы, сортировку и группировку, но не гарантируют ускорения всех запросов – оптимизатор выбирает лучший план.\n- Наиболее эффективна структура B‑дерево; индексы нужны для часто используемых в условиях WHERE, JOIN и ORDER BY столбцов.\n- Индекс повышает скорость чтения, но занимает дисковое пространство и замедляет INSERT/UPDATE/DELETE, так как требует обновления.\n- Создавайте индексы осознанно: обычно только для столбцов, участвующих в поиске, соединениях и сортировках; не индексируйте каждый столбец.\n- Составные индексы полезны, но порядок столбцов критичен; их проектирование требует понимания частых запросов.\n- Анализ планов выполнения помогает оценить, действительно ли новый индекс ускорит запросы.",
+        "reasoning": "We need to produce a short summary of the text, preserving only the most important information. The text is about indexes in relational databases: what they are, why they are used, B-trees, benefits for WHERE, JOIN, ORDER BY, etc., example with users table, but indexes don't always speed up queries, optimizer decides, full table scan may be better for large result sets. Indexes consume disk space and need updates on data modifications, so many indexes can slow writes. Should create indexes thoughtfully, usually on columns used in search, joins, sorting. Composite indexes: order matters. Use query plans to analyze. Indexes are optimization tools, not universal. Balance between read speed, write speed, resources.\n\nWe need to produce a concise summary. Let's produce maybe 5-6 bullet points or a short paragraph. The user wants \"Сделай краткое резюме приведённого текста. Сохрани только наиболее важную информацию.\" So we can produce a short summary in Russian. Let's do that."
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "queue_time": 0.049001167,
+    "prompt_tokens": 997,
+    "prompt_time": 0.093812763,
+    "completion_tokens": 413,
+    "completion_time": 0.459654036,
+    "total_tokens": 1410,
+    "total_time": 0.553466799,
+    "completion_tokens_details": {
+      "reasoning_tokens": 207
+    }
+  },
+  "usage_breakdown": null,
+  "system_fingerprint": "fp_565badff47",
+  "x_groq": {
+    "id": "req_01m373vzvce75806g0vep1s0cc",
+    "seed": 408381604
+  },
+  "service_tier": "on_demand"
+}
